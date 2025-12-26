@@ -1,0 +1,38 @@
+/* 1. Import Fonts */
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+/* 2. Import Tailwind */
+@import "tailwindcss";
+
+/* 3. Theme Configuration - Balanced Hierarchy */
+@theme {
+  --font-sans: "VT323", monospace;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    line-height: 0.0;
+  }
+
+  body {
+    line-height: 0.0;
+  }
+}
+
+@layer utilities {
+  .text-xs { font-size: 1.0rem; line-height: 0.7; }
+  .text-sm { font-size: 1.1rem; line-height: 0.7; }
+  .text-base { font-size: 1.2rem; line-height: 1; }
+  .text-lg { font-size: 1.5rem; line-height: 1; }
+  .compact {
+    --pad-xs: 0.0rem;
+    --pad-sm: 0.0rem;
+    --pad-md: 0.0rem;
+  }
+  .compact-px { padding-inline: 0; }
+  .compact-py { padding-block: 0; }
+  .pixel-radius {
+    border-radius: 0px;
+  }
+}
