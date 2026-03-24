@@ -1274,7 +1274,7 @@ export default function App() {
 
   const handleRenderGif = async () => {
       if (gifFramesRef.current.length === 0) return;
-      setIsRenderingVideo(true); setRenderPhase('Encoding Custom GIF'); setRenderProgress(0);
+      setIsRenderingVideo(true); setRenderPhase('Encoding GIF'); setRenderProgress(0);
       
       const w = settingsRef.current.width; const h = settingsRef.current.height;
       const frames = gifFramesRef.current;
@@ -1526,7 +1526,7 @@ export default function App() {
       </div>
 
       <main className={`flex-1 relative overflow-hidden flex flex-col h-full ${isDark ? 'bg-black' : 'bg-neutral-100'}`} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files?.[0]) processImageFile(e.dataTransfer.files[0]); }}>
-        {!imageSrc && <div onClick={() => document.getElementById('main-upload')?.click()} className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400 cursor-pointer"><ImageIcon className="w-10 h-10 mb-4 opacity-20" /><p>Open or drag an image or short video</p></div>}
+        {!imageSrc && <div onClick={() => document.getElementById('main-upload')?.click()} className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400 cursor-pointer"><ImageIcon className="w-10 h-10 mb-4 opacity-20" /><p>Open/drag an image/video/GIF</p></div>}
         
         {imageSrc && (
             <div 
