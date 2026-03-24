@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { GifReader, GifWriter } from 'omggif';
 import { 
   Upload, Download, Palette, Image as ImageIcon, RefreshCw, Maximize, 
   MoveVertical, MoveHorizontal, Sliders, Lock, Unlock, Contrast, Anchor, 
@@ -1026,16 +1027,6 @@ export default function App() {
     return () => mediaQuery.removeEventListener('change', handler);
   }, []);
 
-  // Dynamically load omggif
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !window.GifReader) {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/omggif@1.0.10/omggif.js';
-      script.async = true;
-      document.head.appendChild(script);
-    }
-  }, []);
-
   const styles = useMemo(() => getThemeStyles(isDark), [isDark]);
 
   const [imageSrc, setImageSrc] = useState(null);
@@ -1131,9 +1122,8 @@ export default function App() {
   }, []);
 
   const processGifBuffer = async (buffer) => {
-      if (!window.GifReader) { alert("GIF library still loading, please try again."); return; }
       const uint8Array = new Uint8Array(buffer);
-      const reader = new window.GifReader(uint8Array);
+      const reader = new GifReader(uint8Array);
       const w = reader.width; const h = reader.height;
       const frameCount = reader.numFrames();
       
@@ -1283,7 +1273,7 @@ export default function App() {
   };
 
   const handleRenderGif = async () => {
-      if (!window.GifWriter || gifFramesRef.current.length === 0) return;
+      if (gifFramesRef.current.length === 0) return;
       setIsRenderingVideo(true); setRenderPhase('Encoding Custom GIF'); setRenderProgress(0);
       
       const w = settingsRef.current.width; const h = settingsRef.current.height;
@@ -1305,7 +1295,7 @@ export default function App() {
       // Overestimate buffer to prevent capacity issues
       const bufSize = Math.max(1024 * 1024 * 5, 1024 + (frames.length * w * h * 3));
       const buffer = new Uint8Array(bufSize);
-      const writer = new window.GifWriter(buffer, w, h, { loop: 0 });
+      const writer = new GifWriter(buffer, w, h, { loop: 0 });
       
       for (let i = 0; i < frames.length; i++) {
           extractFrameFromSource(frames[i].canvas);
