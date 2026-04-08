@@ -5,7 +5,7 @@ import {
   MoveVertical, MoveHorizontal, Sliders, Lock, Unlock, Contrast, Anchor, 
   FolderOpen, Save, FileJson, WrapText, ZoomIn, ZoomOut, 
   Maximize2, Minimize, Focus, SunMoon, RotateCcw, X, Link as LinkIcon, Unlink, Settings, FileType,
-  Eye, EyeOff, Layers, MousePointer2, Dices, Library, Film, Play, Pause, Video
+  Eye, EyeOff, Layers, MousePointer2, Dices, Library, Film, Play, Pause, Video, Trash
 } from 'lucide-react';
 
 // ==========================================
@@ -112,64 +112,90 @@ const ColorSpaceConverter = {
 const SPACE_SCALES = { srgb: 255, linear: 1, oklab: 1, lab: 100, yuv: 255 };
 
 const PRESET_PALETTES = {
-  "Handhelds": {
-    "Game Boy": {
-      "Classic (BGB)": ["#e0f8d0", "#88c070", "#346856", "#081820"],
-      "Pocket (Gray)": ["#e3e6c9", "#c6cba4", "#8e8f5e", "#232323"],
-      "Light (Blue)": ["#00b2a0", "#008a70", "#005240", "#002810"]
-    },
-    "Game Boy Color": {
-      "GBC - Red": ["#f8e8c8", "#d89048", "#a82820", "#000000"],
-      "GBC - Blue": ["#ffffa8", "#68a8f8", "#0000fc", "#000000"],
-      "GBC - Green": ["#f8e8c8", "#58d854", "#389020", "#000000"],
-      "GBC - Yellow": ["#f8f8f8", "#f8f858", "#a8a800", "#000000"],
-      "GBC - Pastel Mix": ["#f8e8c8", "#f8a8b8", "#7890f8", "#000000"]
-    },
-    "SEGA Game Gear": {
-      "System Master": ["#000000", "#555555", "#aaaaaa", "#ffffff", "#550000", "#aa0000", "#ff0000", "#005500", "#00aa00", "#00ff00", "#000055", "#0000aa", "#0000ff", "#aaaa55", "#55aaaa", "#aa55aa"]
-    }
+  "Nintendo Handhelds": {
+    "_source": "Hardware constraints and BIOS presets",
+    "Game Boy Classic (BGB)": ["#e0f8d0", "#88c070", "#346856", "#081820"],
+    "Game Boy Original 4-Tone": ["#9bbc0f", "#8bac0f", "#306230", "#0f380f"],
+    "Game Boy Pocket (Gray)": ["#e3e6c9", "#c6cba4", "#8e8f5e", "#232323"],
+    "Game Boy Light (Blue)": ["#00b2a0", "#008a70", "#005240", "#002810"],
+    "GBC BIOS - Red": ["#f8e8c8", "#d89048", "#a82820", "#000000"],
+    "GBC BIOS - Blue": ["#ffffa8", "#68a8f8", "#0000fc", "#000000"],
+    "GBC BIOS - Green": ["#f8e8c8", "#58d854", "#389020", "#000000"],
+    "GBC BIOS - Yellow": ["#f8f8f8", "#f8f858", "#a8a800", "#000000"],
+    "GBA Branding Scheme": ["#d72424", "#88c834", "#f3f1f2", "#e9d514", "#9999a4", "#153e92"]
   },
-  "Home Consoles": {
-    "NES / Famicom": {
-      "Hardware (55 Colors)": [
+  "Retro Home Consoles": {
+    "_source": "Hardware architectural gamuts and branding",
+    "NES Hardware (55 Colors)": [
         "#7c7c7c", "#0000fc", "#0000bc", "#4428bc", "#940084", "#a80020", "#a81000", "#881400", "#503000", "#007800", "#006800", "#005800", "#004058", "#000000", 
         "#bcbcbc", "#0078f8", "#0058f8", "#6844fc", "#d800cc", "#e40058", "#f83800", "#e45c10", "#ac7c00", "#00b800", "#00a800", "#00a844", "#008888", 
         "#f8f8f8", "#3cbcfc", "#6888fc", "#9878f8", "#f878f8", "#f85898", "#f87858", "#fca044", "#f8b800", "#b8f818", "#58d854", "#58f898", "#00e8d8", "#787878", 
         "#a4e4fc", "#b8b8f8", "#d8b8f8", "#f8b8f8", "#f8a4c0", "#f0d0b0", "#fce0a8", "#f8d878", "#d8f878", "#b8f8b8", "#b8f8d8", "#00fcfc", "#f8d8f8"
-      ]
-    },
-    "Atari 2600": {
-      "NTSC Subset (16 Colors)": ["#000000", "#404040", "#808080", "#c0c0c0", "#ffffff", "#b00000", "#ff5050", "#c000b0", "#ff50ff", "#0000b0", "#5050ff", "#00b000", "#50ff50", "#b0b000", "#ffff50", "#b05000"]
-    }
+    ],
+    "SNES US Controller Shell": ["#b5b6e4", "#4f43ae", "#908a99", "#cec9cc", "#211a21"],
+    "Super Famicom Shell": ["#a7a4e0", "#514689", "#b2b4b2", "#54585a", "#707372"],
+    "SFC Face Buttons": ["#eb1a1d", "#fece15", "#0749b4", "#008d45"],
+    "SEGA Master System Hardware": [
+        "#000000", "#550000", "#aa0000", "#ff0000", "#005500", "#555500", "#aa5500", "#ff5500", "#00aa00", "#55aa00", "#aaaa00", "#ffaa00", "#00ff00", "#55ff00", "#aaff00", "#ffff00",
+        "#000055", "#550055", "#aa0055", "#ff0055", "#005555", "#555555", "#aa5555", "#ff5555", "#00aa55", "#55aa55", "#aaaa55", "#ffaa55", "#00ff55", "#55ff55", "#aaff55", "#ffff55",
+        "#0000aa", "#5500aa", "#aa00aa", "#ff00aa", "#0055aa", "#5555aa", "#aa55aa", "#ff55aa", "#00aaaa", "#55aaaa", "#aaaaaa", "#ffaaaa", "#00ffaa", "#55ffaa", "#aaffaa", "#ffffaa",
+        "#0000ff", "#5500ff", "#aa00ff", "#ff00ff", "#0055ff", "#5555ff", "#aa55ff", "#ff55ff", "#00aaff", "#55aaff", "#aaaaff", "#ffaaff", "#00ffff", "#55ffff", "#aaffff", "#ffffff"
+    ],
+    "SEGA Game Gear System Master": ["#000000", "#555555", "#aaaaaa", "#ffffff", "#550000", "#aa0000", "#ff0000", "#005500", "#00aa00", "#00ff00", "#000055", "#0000aa", "#0000ff", "#aaaa55", "#55aaaa", "#aa55aa"],
+    "Atari 2600 NTSC Subset": ["#000000", "#404040", "#808080", "#c0c0c0", "#ffffff", "#b00000", "#ff5050", "#c000b0", "#ff50ff", "#0000b0", "#5050ff", "#00b000", "#50ff50", "#b0b000", "#ffff50", "#b05000"]
   },
   "Vintage Computers": {
-    "IBM PC (CGA)": {
-      "Mode 4 - Pal 0 (High)": ["#000000", "#55ff55", "#ff5555", "#ffff55"],
-      "Mode 4 - Pal 1 (High)": ["#000000", "#55ffff", "#ff55ff", "#ffffff"]
-    },
-    "Commodore 64": {
-      "Pepto Default (16 Colors)": ["#000000", "#ffffff", "#880000", "#aaffee", "#cc44cc", "#00cc55", "#0000aa", "#eeee77", "#dd8855", "#664400", "#ff7777", "#333333", "#777777", "#aaff66", "#0088ff", "#bbbbbb"]
-    },
-    "Apple Macintosh": {
-      "System 8 (16-Color)": ["#ffffff", "#fbf305", "#ff6403", "#dd0907", "#f20884", "#4700a5", "#0000d3", "#02abea", "#1fb714", "#006412", "#562c05", "#90713a", "#c0c0c0", "#808080", "#404040", "#000000"]
-    }
+    "_source": "Classic PC architecture palettes",
+    "IBM PC CGA Mode 4 Pal 0": ["#000000", "#55ff55", "#ff5555", "#ffff55"],
+    "IBM PC CGA Mode 4 Pal 1": ["#000000", "#55ffff", "#ff55ff", "#ffffff"],
+    "IBM PC CGA 16-Color": ["#000000", "#0000aa", "#00aa00", "#00aaaa", "#aa0000", "#aa00aa", "#aa5500", "#aaaaaa", "#555555", "#5555ff", "#55ff55", "#55ffff", "#ff5555", "#ff55ff", "#ffff55", "#ffffff"],
+    "Commodore 64 Pepto Default": ["#000000", "#ffffff", "#880000", "#aaffee", "#cc44cc", "#00cc55", "#0000aa", "#eeee77", "#dd8855", "#664400", "#ff7777", "#333333", "#777777", "#aaff66", "#0088ff", "#bbbbbb"],
+    "Apple Macintosh System 8": ["#ffffff", "#fbf305", "#ff6403", "#dd0907", "#f20884", "#4700a5", "#0000d3", "#02abea", "#1fb714", "#006412", "#562c05", "#90713a", "#c0c0c0", "#808080", "#404040", "#000000"]
   },
-  "Pixel Art & Fantasy": {
-    "PICO-8": {
-      "Standard (16 Colors)": ["#000000", "#1d2b53", "#7e2553", "#008751", "#ab5236", "#5f574f", "#c2c3c7", "#fff1e8", "#ff004d", "#ffa300", "#ffec27", "#00e436", "#29adff", "#83769c", "#ff77a8", "#ffccaa"]
-    },
-    "DawnBringer": {
-      "DB16": ["#140c1c", "#442434", "#30346d", "#4e4a4e", "#854c30", "#346524", "#d04648", "#757161", "#597dce", "#d27d2c", "#8595a1", "#6daa2c", "#d2aa99", "#6dc2ca", "#dad45e", "#deeed6"]
-    }
+  "Pixel Art Communities": {
+    "_source": "Curated palettes from Lospec",
+    "PICO-8 Standard": ["#000000", "#1d2b53", "#7e2553", "#008751", "#ab5236", "#5f574f", "#c2c3c7", "#fff1e8", "#ff004d", "#ffa300", "#ffec27", "#00e436", "#29adff", "#83769c", "#ff77a8", "#ffccaa"],
+    "DawnBringer DB16": ["#140c1c", "#442434", "#30346d", "#4e4a4e", "#854c30", "#346524", "#d04648", "#757161", "#597dce", "#d27d2c", "#8595a1", "#6daa2c", "#d2aa99", "#6dc2ca", "#dad45e", "#deeed6"],
+    "DawnBringer DB32": ["#000000", "#222034", "#45283c", "#663931", "#8f563b", "#df7126", "#d9a066", "#eec39a", "#fbf236", "#99e550", "#6abe30", "#37946e", "#4b692f", "#524b24", "#323c39", "#3f3f74", "#306082", "#5b6ee1", "#639bff", "#5fcde4", "#cbdbfc", "#ffffff", "#9badb7", "#847e87", "#696a6a", "#595652", "#76428a", "#ac3232", "#d95763", "#d77bba", "#8f974a", "#8a6f30"],
+    "Lospec T-Lollipop": ["#fce3ef", "#00b2d2", "#4a2e5d", "#1e0521"],
+    "Lospec Dream Haze": ["#f4d9b1", "#7fa2a8", "#5e778c", "#495a70", "#3e485e", "#35394d", "#2d2a3d", "#221c29"],
+    "Lospec Nostalgic Dreams": ["#e0f8cf", "#86c06c", "#306850", "#071821", "#f8f8a8", "#d04648", "#2c5f8a", "#6abfb0"],
+    "Lospec Jehkoba32": ["#20101b", "#3d1e2e", "#612739", "#a3273e", "#e23a41", "#ff7e59", "#ffb261", "#ffe285", "#bceb59", "#6bce56", "#2d9c5b", "#1a5e4d", "#15333b", "#162029", "#243242", "#3a5666", "#518294", "#77b2bd", "#a7d3d1", "#e3eff2", "#abb4b8", "#7a828a", "#545b61", "#33373b", "#1c1e21", "#33222e", "#593144", "#85415a", "#b55977", "#e37f9b", "#ffadc2", "#ffe8ed"]
   },
-  "Themes & CMYK": {
-    "CMYK Basic": {
-      "CMYK+W": ["#ffffff", "#00ffff", "#ff00ff", "#ffff00", "#000000"]
-    },
-    "Monochrome": {
-      "1-Bit Noir": ["#000000", "#ffffff"],
-      "Matrix Green": ["#020b00", "#00ff41"]
-    }
+  "Crayola Crayons": {
+    "_source": "Jenny's Crayon Collection subsets mapped by box tier ",
+    "8-Count Box": ["#ed0a3f", "#ff861f", "#fbe870", "#0066ff", "#01a368", "#8359a3", "#af593e", "#000000"],
+    "16-Count Box": ["#ed0a3f", "#ff861f", "#fbe870", "#0066ff", "#01a368", "#8359a3", "#af593e", "#000000", "#ff3f34", "#ffaacc", "#c5e17a", "#7366bd", "#0095b7", "#bb3385", "#ffffff", "#8b8680"],
+    "24-Count Box": ["#ed0a3f", "#ff861f", "#fbe870", "#0066ff", "#01a368", "#8359a3", "#af593e", "#000000", "#ff3f34", "#ffaacc", "#c5e17a", "#7366bd", "#0095b7", "#bb3385", "#ffffff", "#8b8680", "#03bb85", "#ffdf00", "#0a6b0d", "#8fd8d8", "#a36f40", "#f653a6", "#ca3435", "#ffcba4"],
+    "32-Count Box": ["#ed0a3f", "#ff861f", "#fbe870", "#0066ff", "#01a368", "#8359a3", "#af593e", "#000000", "#ff3f34", "#ffaacc", "#c5e17a", "#7366bd", "#0095b7", "#bb3385", "#ffffff", "#8b8680", "#03bb85", "#ffdf00", "#0a6b0d", "#8fd8d8", "#a36f40", "#f653a6", "#ca3435", "#ffcba4", "#ffae42", "#cd919e", "#fa9d5a", "#b4674d", "#1dacd6", "#fddb6d", "#1cac78", "#5d76cb"],
+    "48-Count Box": ["#ed0a3f", "#ff861f", "#fbe870", "#0066ff", "#01a368", "#8359a3", "#af593e", "#000000", "#ff3f34", "#ffaacc", "#c5e17a", "#7366bd", "#0095b7", "#bb3385", "#ffffff", "#8b8680", "#03bb85", "#ffdf00", "#0a6b0d", "#8fd8d8", "#a36f40", "#f653a6", "#ca3435", "#ffcba4", "#ffae42", "#cd919e", "#fa9d5a", "#b4674d", "#1dacd6", "#fddb6d", "#1cac78", "#5d76cb", "#ff7f49", "#ea7e5d", "#b0b7c6", "#ffff99", "#1cd3a2", "#dd4492", "#bc5d58", "#dd9475", "#9aceeb", "#ffbcd9", "#2b6cc4", "#efcdb8", "#6e5160", "#ceff1d", "#71bc78", "#6dae81"],
+    "64-Count Box": ["#ed0a3f", "#ff861f", "#fbe870", "#0066ff", "#01a368", "#8359a3", "#af593e", "#000000", "#ff3f34", "#ffaacc", "#c5e17a", "#7366bd", "#0095b7", "#bb3385", "#ffffff", "#8b8680", "#03bb85", "#ffdf00", "#0a6b0d", "#8fd8d8", "#a36f40", "#f653a6", "#ca3435", "#ffcba4", "#ffae42", "#cd919e", "#fa9d5a", "#b4674d", "#1dacd6", "#fddb6d", "#1cac78", "#5d76cb", "#ff7f49", "#ea7e5d", "#b0b7c6", "#ffff99", "#1cd3a2", "#dd4492", "#bc5d58", "#dd9475", "#9aceeb", "#ffbcd9", "#2b6cc4", "#efcdb8", "#6e5160", "#ceff1d", "#71bc78", "#6dae81", "#c364c5", "#cc6666", "#e7c697", "#fcd975", "#a8e4a0", "#95918c", "#1164b4", "#f0e891", "#ff1dce", "#b2ec5d", "#ca3767", "#3bb08f", "#fefe22", "#fcb4d5", "#1a4876", "#30ba8f"],
+    "96-Count Box": ["#ed0a3f", "#ff861f", "#fbe870", "#0066ff", "#01a368", "#8359a3", "#af593e", "#000000", "#ff3f34", "#ffaacc", "#c5e17a", "#7366bd", "#0095b7", "#bb3385", "#ffffff", "#8b8680", "#03bb85", "#ffdf00", "#0a6b0d", "#8fd8d8", "#a36f40", "#f653a6", "#ca3435", "#ffcba4", "#ffae42", "#cd919e", "#fa9d5a", "#b4674d", "#1dacd6", "#fddb6d", "#1cac78", "#5d76cb", "#ff7f49", "#ea7e5d", "#b0b7c6", "#ffff99", "#1cd3a2", "#dd4492", "#bc5d58", "#dd9475", "#9aceeb", "#ffbcd9", "#2b6cc4", "#efcdb8", "#6e5160", "#ceff1d", "#71bc78", "#6dae81", "#c364c5", "#cc6666", "#e7c697", "#fcd975", "#a8e4a0", "#95918c", "#1164b4", "#f0e891", "#ff1dce", "#b2ec5d", "#ca3767", "#3bb08f", "#fefe22", "#fcb4d5", "#1a4876", "#30ba8f", "#1974d2", "#ffa343", "#bab86c", "#ff7538", "#ff2b2b", "#f8d568", "#e6a8d7", "#414a4c", "#1ca9c9", "#ffcfab", "#c5d0e6", "#fdd7e4", "#158078", "#fc74fd", "#f780a1", "#8e4585", "#7442c8", "#9d81ba", "#fe4eda", "#ff496c", "#d68a59", "#e3256b", "#ee204d", "#ff5349", "#c0448f", "#1fcecb", "#ff5050", "#f75394", "#eecabe", "#ff9baa", "#fc2847"],
+    "120-Count Box": ["#ed0a3f", "#ff861f", "#fbe870", "#0066ff", "#01a368", "#8359a3", "#af593e", "#000000", "#ff3f34", "#ffaacc", "#c5e17a", "#7366bd", "#0095b7", "#bb3385", "#ffffff", "#8b8680", "#03bb85", "#ffdf00", "#0a6b0d", "#8fd8d8", "#a36f40", "#f653a6", "#ca3435", "#ffcba4", "#ffae42", "#cd919e", "#fa9d5a", "#b4674d", "#1dacd6", "#fddb6d", "#1cac78", "#5d76cb", "#ff7f49", "#ea7e5d", "#b0b7c6", "#ffff99", "#1cd3a2", "#dd4492", "#bc5d58", "#dd9475", "#9aceeb", "#ffbcd9", "#2b6cc4", "#efcdb8", "#6e5160", "#ceff1d", "#71bc78", "#6dae81", "#c364c5", "#cc6666", "#e7c697", "#fcd975", "#a8e4a0", "#95918c", "#1164b4", "#f0e891", "#ff1dce", "#b2ec5d", "#ca3767", "#3bb08f", "#fefe22", "#fcb4d5", "#1a4876", "#30ba8f", "#1974d2", "#ffa343", "#bab86c", "#ff7538", "#ff2b2b", "#f8d568", "#e6a8d7", "#414a4c", "#1ca9c9", "#ffcfab", "#c5d0e6", "#fdd7e4", "#158078", "#fc74fd", "#f780a1", "#8e4585", "#7442c8", "#9d81ba", "#fe4eda", "#ff496c", "#d68a59", "#e3256b", "#ee204d", "#ff5349", "#c0448f", "#1fcecb", "#ff5050", "#f75394", "#eecabe", "#ff9baa", "#fc2847", "#93dfb8", "#a5694f", "#8a795d", "#45cea2", "#fb7efd", "#cdc5c2", "#80daeb", "#ecebbd", "#ffcf48", "#fd5e53", "#faa76c", "#fc89ac", "#dbd7d2", "#17806d", "#deaa88", "#77dde7", "#fdfc74", "#926eae", "#8f509d", "#a2add0", "#fc6c85", "#cda4de", "#fdfa72", "#ffb653", "#c5e384"],
+    "Colors of the World (24-Count)": ["#513529", "#6e5046", "#88605e", "#986a5a", "#ac8065", "#d19c7d", "#e0b5a4", "#e6b9b3", "#e6d2d3", "#eee6cf", "#5f452e", "#8d5b28", "#a16b4f", "#dea26c", "#f0c9a2", "#eddbc7", "#f0dfcf", "#6c4d4b", "#8f6c68", "#b86f69", "#ee8e99", "#f4afb2", "#fac7c3", "#f7e1e3"]
+  },
+  "Professional Art Supplies": {
+    "_source": "Official Swatch Archives and LEGO Pick a Brick",
+    "Lego - solid colors": ["#b40000", "#ca4c0b", "#bb805a", "#91501c", "#e1bea1", "#5f3109", "#aa7d55", "#d67923", "#372100", "#fcac00", "#897d62", "#ccb98d", "#fac80a", "#ffec6c", "#77774e", "#ffff00", "#a5ca18", "#e2f99a", "#00852b", "#00451a", "#708e7c", "#d3f2ea", "#009894", "#68c3e2", "#469bc3", "#1e5aa8", "#9dc3f7", "#7396c8", "#70819a", "#19325a", "#000001", "#441a91", "#a06eb9", "#cda4de", "#901f76", "#c8509b", "#ff9ecd", "#720012", "#f06d78", "#f4f4f4", "#969696", "#646464"],
+    "Prismacolor Premier Select": [
+        "#fffdd0", "#e8d3a7", "#fad675", "#fde047", "#fada5e", "#ffeb00", "#ffc30b", "#ffae42", "#f79f1f", "#e47200", 
+        "#e54622", "#d82e3f", "#c8102e", "#9e1b32", "#8a1538", "#d10056", "#e4007c", "#ff69b4", "#f7cac9", "#e1c699", 
+        "#c6a4a4", "#915c83", "#702963", "#4a192c", "#800080", "#5c2e91", "#483d8b", "#000080", "#0033a0", "#005a9c", 
+        "#0076ce", "#00a3e0", "#41b6e6", "#87ceeb", "#00bce4", "#009ca6", "#008b8b", "#006400", "#228b22", "#32cd32", 
+        "#7cfc00", "#adff2f", "#f5f5dc", "#d2b48c", "#c19a6b", "#8b4513", "#a0522d", "#d2691e", "#cd853f", "#654321", 
+        "#3b2f2f", "#4b3621", "#1a1110", "#808080", "#a9a9a9", "#d3d3d3", "#c0c0c0", "#ffffff", "#000000", "#2f4f4f"
+    ],
+    "Tombow ABT Dual Brush Select": ["#ffcc99", "#ff9900", "#ffcc00", "#cc9900", "#ffff00", "#ffff66", "#cccc00", "#ffff99", "#99cc00", "#cccc33", "#ccff00", "#99ff00", "#336600", "#99cc33", "#006633", "#669933", "#99ff66", "#99cc99", "#66ffcc", "#339933", "#003300", "#336633", "#e6f2ff", "#00cc66", "#006600", "#339966", "#336699", "#00cc99", "#66ffff", "#3399ff", "#009999", "#00ffff", "#66ccff", "#00ccff", "#0099ff", "#b3d9ff", "#0000ff", "#cce6ff", "#0066ff", "#000099", "#0099cc", "#0033cc", "#e6ccff", "#3333ff", "#000066", "#003366", "#ccccff", "#6600cc", "#cc99ff", "#9966cc", "#660099", "#9900cc", "#cc66ff", "#660066", "#330033", "#cc0066", "#ffccff", "#ff66cc", "#ff0066", "#ff3399", "#cc0033", "#990033", "#ff99cc", "#cc6699", "#ffccdd", "#ff3366", "#cc0000", "#990066", "#ff6600", "#990000", "#ff0000", "#cc0000", "#ffccaa", "#ff3300", "#ff6633", "#663300", "#ff3333", "#cc3300", "#ff0000", "#ffcccc", "#ff9999", "#ff3300", "#ff6600", "#cc9966", "#cc6600", "#cc3300", "#663300", "#996633", "#ffcc00", "#ffeecc", "#ffcc66", "#ffcc33", "#ff9900", "#ffffff", "#000000", "#1a1a1a", "#333333", "#4d4d4d", "#666666", "#808080", "#999999", "#b3b3b3", "#cccccc", "#e6e6e6", "#f2f2f2", "#ffffff"],
+    "Copic Ciao Mini Pop": ["#fffcd1", "#f6f1f3", "#e3e7f5", "#ecd0ad", "#edf6f2", "#eaeff2"],
+    "Copic Classic Cool Grays": ["#ffffff", "#eaeaea", "#d9e1e5", "#b7c1c8", "#6d767c", "#231916", "#302724"],
+    "Copic Violet & Lavender": ["#eeecf5", "#eee7f1", "#e9e3f0", "#c8c4df", "#bec4df", "#92a4ce", "#b08cb9", "#e0dcec", "#dce3f2", "#c4cde1"]
+  },
+  "Themes & Essentials": {
+    "_source": "Basic Color Standards",
+    "CMYK+W Basic": ["#ffffff", "#00ffff", "#ff00ff", "#ffff00", "#000000"],
+    "1-Bit Noir Monochrome": ["#000000", "#ffffff"],
+    "Matrix Green Terminal": ["#020b00", "#00ff41"],
+    "RGB Pure Primary": ["#ff0000", "#00ff00", "#0000ff"]
   }
 };
 
@@ -324,21 +350,22 @@ const extractPaletteHull = (pixels, k, settings, lockedColors = []) => {
   return finalColors.map((c, i) => ({ ...c, impactIndex: i }));
 };
 
-const findNearestColorEuclidean = (v0, v1, v2, palette) => {
+const findNearestColorEuclidean = (vArr, palette) => {
     let minDist = Infinity; let nearest = palette[0]; 
     for (let i = 0; i < palette.length; i++) {
         const p = palette[i]; 
-        const d0 = v0 - p.transformed[0], d1 = v1 - p.transformed[1], d2 = v2 - p.transformed[2];
-        const d = d0*d0 + d1*d1 + d2*d2;
+        let d = 0;
+        for (let k = 0; k < vArr.length; k++) d += (vArr[k] - p.transformed[k]) * (vArr[k] - p.transformed[k]);
         if (d < minDist) { minDist = d; nearest = p; }
     }
     return nearest;
 };
 
-const findNNearestColorsEuclidean = (v0, v1, v2, palette, n) => {
+const findNNearestColorsEuclidean = (vArr, palette, n) => {
     const distances = palette.map(p => {
-        const d0 = v0 - p.transformed[0], d1 = v1 - p.transformed[1], d2 = v2 - p.transformed[2];
-        return { color: p, dist: d0*d0 + d1*d1 + d2*d2 };
+        let d = 0;
+        for (let k = 0; k < vArr.length; k++) d += (vArr[k] - p.transformed[k]) * (vArr[k] - p.transformed[k]);
+        return { color: p, dist: d };
     });
     distances.sort((a, b) => a.dist - b.dist);
     return distances.slice(0, n);
@@ -370,20 +397,52 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
     const { colorSpace, manualWeights, ditherCategory, ditherSubMethod, dithering, bayerSize, serpentine, nCandidates, distanceExponent, riemersmaHistory, ditherSeed, matchMethod } = settings;
     const Converter = ColorSpaceConverter[colorSpace];
     
+    const isBeerLambert = ditherSubMethod === 'paper-beer-lambert';
+    const isMixbox = ditherSubMethod === 'paper-mixbox';
+    const mixboxReady = isMixbox && window.mixbox && window.mixbox.LATENT_SIZE;
+    
+    const D = mixboxReady ? window.mixbox.LATENT_SIZE : 3;
+    
     // Scale Euclidean space internally based on manual weights to unify all distance math
     const w0 = colorSpace === 'srgb' || colorSpace === 'linear' ? Math.sqrt(manualWeights.r) : 1;
     const w1 = colorSpace === 'srgb' || colorSpace === 'linear' ? Math.sqrt(manualWeights.g) : 1;
     const w2 = colorSpace === 'srgb' || colorSpace === 'linear' ? Math.sqrt(manualWeights.b) : 1;
     
     const workingPalette = palette.map(p => {
+        if (isBeerLambert) {
+            const [lr, lg, lb] = ColorSpaceConverter.linear.to(p.r, p.g, p.b);
+            return { ...p, transformed: [-Math.log(Math.max(lr, 0.001)), -Math.log(Math.max(lg, 0.001)), -Math.log(Math.max(lb, 0.001))] };
+        }
+        if (mixboxReady) {
+            return { ...p, transformed: window.mixbox.rgbToLatent([p.r, p.g, p.b]) };
+        }
         const [v0, v1, v2] = Converter.to(p.r, p.g, p.b);
         return { ...p, transformed: [v0 * w0, v1 * w1, v2 * w2] };
     });
 
-    const wbuf = new Float32Array(width * height * 3);
-    for (let i = 0, j = 0; i < pixels.length; i += 4, j += 3) {
-        const [v0, v1, v2] = Converter.to(pixels[i], pixels[i+1], pixels[i+2]);
-        wbuf[j] = v0 * w0; wbuf[j+1] = v1 * w1; wbuf[j+2] = v2 * w2;
+    if (mixboxReady) {
+        // Appending White gives the solver a "Paper" base to bleed into when mixing shouldn't reach 100% saturation
+        workingPalette.push({
+            isWhitePaper: true,
+            displayR: 255, displayG: 255, displayB: 255,
+            transformed: window.mixbox.rgbToLatent([255, 255, 255])
+        });
+    }
+
+    const wbuf = new Float32Array(width * height * D);
+    for (let i = 0, j = 0; i < pixels.length; i += 4, j += D) {
+        if (isBeerLambert) {
+            const [lr, lg, lb] = ColorSpaceConverter.linear.to(pixels[i], pixels[i+1], pixels[i+2]);
+            wbuf[j] = -Math.log(Math.max(lr, 0.001));
+            wbuf[j+1] = -Math.log(Math.max(lg, 0.001));
+            wbuf[j+2] = -Math.log(Math.max(lb, 0.001));
+        } else if (mixboxReady) {
+            const z = window.mixbox.rgbToLatent([pixels[i], pixels[i+1], pixels[i+2]]);
+            for (let k = 0; k < D; k++) wbuf[j+k] = z[k];
+        } else {
+            const [v0, v1, v2] = Converter.to(pixels[i], pixels[i+1], pixels[i+2]);
+            wbuf[j] = v0 * w0; wbuf[j+1] = v1 * w1; wbuf[j+2] = v2 * w2;
+        }
     }
 
     const validNCandidates = Math.max(1, nCandidates || 4);
@@ -395,115 +454,180 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
         return isNaN(val) ? 0 : val;
     };
 
-    // Pre-allocated buffers for Frank-Wolfe NNLS
+    // Pre-allocated buffers for analytical projection solvers (Scales to any N Dimensions)
     const fwWeights = new Float32Array(workingPalette.length);
-    const fwCurrentPos = new Float32Array(3);
-    const fwError = new Float32Array(3);
-    const fwDelta = new Float32Array(3);
+    const fwCurrentPos = new Float32Array(D);
+    const fwError = new Float32Array(D);
+    const fwDelta = new Float32Array(D);
 
-    const runFW = (v0, v1, v2) => {
+    // Standard Frank-Wolfe for probability simplex (Linear Projection & Mixbox)
+    const runFW = (vArr) => {
         const P = workingPalette.length;
         fwWeights.fill(0);
         
         let bestStartIdx = 0, minDist = Infinity;
         for (let p = 0; p < P; p++) {
             const c = workingPalette[p].transformed;
-            const d0 = c[0] - v0, d1 = c[1] - v1, d2 = c[2] - v2;
-            const d = d0*d0 + d1*d1 + d2*d2;
+            let d = 0;
+            for (let k = 0; k < D; k++) d += (c[k] - vArr[k]) * (c[k] - vArr[k]);
             if (d < minDist) { minDist = d; bestStartIdx = p; }
         }
 
         fwWeights[bestStartIdx] = 1.0;
         const startC = workingPalette[bestStartIdx].transformed;
-        fwCurrentPos[0] = startC[0]; fwCurrentPos[1] = startC[1]; fwCurrentPos[2] = startC[2];
+        for (let k = 0; k < D; k++) fwCurrentPos[k] = startC[k];
 
         for (let iter = 0; iter < 15; iter++) {
-            fwError[0] = fwCurrentPos[0] - v0;
-            fwError[1] = fwCurrentPos[1] - v1;
-            fwError[2] = fwCurrentPos[2] - v2;
+            for (let k = 0; k < D; k++) fwError[k] = fwCurrentPos[k] - vArr[k];
 
             let minDot = Infinity;
             let bestIdx = -1;
 
             for (let p = 0; p < P; p++) {
                 const c = workingPalette[p].transformed;
-                const dot = c[0]*fwError[0] + c[1]*fwError[1] + c[2]*fwError[2];
+                let dot = 0;
+                for (let k = 0; k < D; k++) dot += c[k] * fwError[k];
                 if (dot < minDot) { minDot = dot; bestIdx = p; }
             }
 
+            let deltaSq = 0;
             const targetC = workingPalette[bestIdx].transformed;
-            fwDelta[0] = targetC[0] - fwCurrentPos[0];
-            fwDelta[1] = targetC[1] - fwCurrentPos[1];
-            fwDelta[2] = targetC[2] - fwCurrentPos[2];
+            for (let k = 0; k < D; k++) {
+                fwDelta[k] = targetC[k] - fwCurrentPos[k];
+                deltaSq += fwDelta[k] * fwDelta[k];
+            }
 
-            const deltaSq = fwDelta[0]*fwDelta[0] + fwDelta[1]*fwDelta[1] + fwDelta[2]*fwDelta[2];
             if (deltaSq < 1e-6) break;
 
-            const errDotDelta = fwError[0]*fwDelta[0] + fwError[1]*fwDelta[1] + fwError[2]*fwDelta[2];
-            const gamma = clamp(-errDotDelta / deltaSq, 0, 1);
+            let errDotDelta = 0;
+            for (let k = 0; k < D; k++) errDotDelta += fwError[k] * fwDelta[k];
 
+            const gamma = clamp(-errDotDelta / deltaSq, 0, 1);
             if (gamma === 0) break;
 
-            fwCurrentPos[0] += gamma * fwDelta[0];
-            fwCurrentPos[1] += gamma * fwDelta[1];
-            fwCurrentPos[2] += gamma * fwDelta[2];
+            for (let k = 0; k < D; k++) fwCurrentPos[k] += gamma * fwDelta[k];
 
             for (let p = 0; p < P; p++) fwWeights[p] *= (1 - gamma);
             fwWeights[bestIdx] += gamma;
         }
     };
 
-    const getNearestColor = (v0, v1, v2) => {
+    // Coordinate Descent for hypercube bounds 0.0 to 1.0 (Beer-Lambert Subtractive)
+    const runBoundedCD = (vArr) => {
+        const P = workingPalette.length;
+        fwWeights.fill(0);
+        for (let k = 0; k < D; k++) fwError[k] = -vArr[k]; 
+
+        for (let iter = 0; iter < 20; iter++) {
+            let maxChange = 0;
+            for (let p = 0; p < P; p++) {
+                const c = workingPalette[p].transformed;
+                let AkSq = 0;
+                for (let k = 0; k < D; k++) AkSq += c[k] * c[k];
+                if (AkSq < 1e-6) continue;
+
+                let dot = 0;
+                for (let k = 0; k < D; k++) dot += fwError[k] * c[k];
+                const delta = -dot / AkSq;
+
+                const oldW = fwWeights[p];
+                const newW = clamp(oldW + delta, 0, 1);
+                const actualChange = newW - oldW;
+
+                if (Math.abs(actualChange) > 1e-5) {
+                    fwWeights[p] = newW;
+                    for (let k = 0; k < D; k++) fwError[k] += actualChange * c[k];
+                    if (Math.abs(actualChange) > maxChange) maxChange = Math.abs(actualChange);
+                }
+            }
+            if (maxChange < 1e-4) break;
+        }
+    };
+
+    const getNearestColor = (vArr) => {
         if (matchMethod === 'fw') {
-            runFW(v0, v1, v2);
+            runFW(vArr);
             let maxW = -1;
             let bestC = workingPalette[0];
             for (let p = 0; p < workingPalette.length; p++) {
-                if (fwWeights[p] > maxW) {
+                if (fwWeights[p] > maxW && !workingPalette[p].isWhitePaper) {
                     maxW = fwWeights[p];
                     bestC = workingPalette[p];
                 }
             }
             return bestC;
         }
-        return findNearestColorEuclidean(v0, v1, v2, workingPalette);
+        return findNearestColorEuclidean(vArr, workingPalette);
     };
 
-    const getNNearestColors = (v0, v1, v2, n) => {
+    const getNNearestColors = (vArr, n) => {
         if (matchMethod === 'fw') {
-            runFW(v0, v1, v2);
-            const candidates = workingPalette.map((color, i) => {
-                const c = color.transformed;
-                const d0 = c[0] - v0, d1 = c[1] - v1, d2 = c[2] - v2;
-                return { color, weight: fwWeights[i], dist: d0*d0 + d1*d1 + d2*d2 };
-            });
+            runFW(vArr);
+            const candidates = workingPalette
+                .filter(color => !color.isWhitePaper)
+                .map((color, i) => {
+                    const c = color.transformed;
+                    let dist = 0;
+                    for (let k = 0; k < D; k++) dist += (c[k] - vArr[k]) * (c[k] - vArr[k]);
+                    return { color, weight: fwWeights[i], dist };
+                });
             candidates.sort((a, b) => b.weight - a.weight);
             return candidates.slice(0, n);
         }
-        return findNNearestColorsEuclidean(v0, v1, v2, workingPalette, n);
+        return findNNearestColorsEuclidean(vArr, workingPalette, n);
     };
 
     if (ditherCategory === 'analytical') {
-        for (let i = 0, j = 0; i < pixels.length; i += 4, j += 3) {
+        for (let i = 0, j = 0; i < pixels.length; i += 4, j += D) {
             if (pixels[i+3] < 128) continue;
-            const v0 = wbuf[j], v1 = wbuf[j+1], v2 = wbuf[j+2];
             
-            if (ditherSubMethod === 'linear-projection') {
-                runFW(v0, v1, v2);
-                let outR = 0, outG = 0, outB = 0;
-                for (let p = 0; p < workingPalette.length; p++) {
-                    const w = fwWeights[p];
-                    if (w > 0.001) {
-                        const c = workingPalette[p];
-                        const [u0, u1, u2] = Converter.to(c.displayR, c.displayG, c.displayB);
-                        outR += u0 * w; outG += u1 * w; outB += u2 * w;
-                    }
+            const vArr = wbuf.subarray(j, j + D);
+            
+            if (ditherSubMethod === 'linear-projection' || ditherSubMethod === 'paper-beer-lambert' || ditherSubMethod === 'paper-mixbox') {
+                if (isBeerLambert) {
+                    runBoundedCD(vArr);
+                } else {
+                    runFW(vArr);
                 }
-                const [r, g, b] = Converter.from(outR, outG, outB);
-                pixels[i] = clamp(r, 0, 255); pixels[i+1] = clamp(g, 0, 255); pixels[i+2] = clamp(b, 0, 255); 
+                
+                if (isBeerLambert) {
+                    let outR = 0, outG = 0, outB = 0;
+                    for (let p = 0; p < workingPalette.length; p++) {
+                        const w = fwWeights[p];
+                        if (w > 0.001) {
+                            const c = workingPalette[p].transformed;
+                            outR += c[0] * w; outG += c[1] * w; outB += c[2] * w;
+                        }
+                    }
+                    const [r, g, b] = ColorSpaceConverter.linear.from(Math.exp(-outR), Math.exp(-outG), Math.exp(-outB));
+                    pixels[i] = clamp(r, 0, 255); pixels[i+1] = clamp(g, 0, 255); pixels[i+2] = clamp(b, 0, 255); 
+                } else if (mixboxReady) {
+                    let zMix = new Array(D).fill(0);
+                    for (let p = 0; p < workingPalette.length; p++) {
+                        const w = fwWeights[p];
+                        if (w > 0.001) {
+                            const c = workingPalette[p].transformed;
+                            for (let k = 0; k < D; k++) zMix[k] += w * c[k];
+                        }
+                    }
+                    const rgb = window.mixbox.latentToRgb(zMix);
+                    pixels[i] = clamp(rgb[0], 0, 255); pixels[i+1] = clamp(rgb[1], 0, 255); pixels[i+2] = clamp(rgb[2], 0, 255);
+                } else {
+                    let outR = 0, outG = 0, outB = 0;
+                    for (let p = 0; p < workingPalette.length; p++) {
+                        const w = fwWeights[p];
+                        if (w > 0.001) {
+                            const c = workingPalette[p];
+                            const [u0, u1, u2] = Converter.to(c.displayR, c.displayG, c.displayB);
+                            outR += u0 * w; outG += u1 * w; outB += u2 * w;
+                        }
+                    }
+                    const [r, g, b] = Converter.from(outR, outG, outB);
+                    pixels[i] = clamp(r, 0, 255); pixels[i+1] = clamp(g, 0, 255); pixels[i+2] = clamp(b, 0, 255); 
+                }
                 continue; 
             }
-            const nearest = getNearestColor(v0, v1, v2);
+            const nearest = getNearestColor(vArr);
             if (nearest) { pixels[i] = nearest.displayR; pixels[i+1] = nearest.displayG; pixels[i+2] = nearest.displayB; }
         }
     } else if (ditherCategory === 'flow') {
@@ -516,7 +640,7 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
 
             for (const {x, y} of curve) {
                 const idx = (y * width + x) * 4;
-                const j = (y * width + x) * 3;
+                const j = (y * width + x) * D;
                 if (pixels[idx + 3] < 128) continue;
 
                 let err0 = 0, err1 = 0, err2 = 0;
@@ -535,7 +659,7 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                 const [t0, t1, t2] = Converter.to(cR, cG, cB);
                 const safe0 = t0 * w0, safe1 = t1 * w1, safe2 = t2 * w2;
                 
-                const nearest = getNearestColor(safe0, safe1, safe2);
+                const nearest = getNearestColor([safe0, safe1, safe2]);
                 
                 if (nearest) {
                     pixels[idx] = nearest.displayR; pixels[idx+1] = nearest.displayG; pixels[idx+2] = nearest.displayB;
@@ -549,12 +673,11 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                 const startX = isRev ? width - 1 : 0; const endX = isRev ? -1 : width; const stepX = isRev ? -1 : 1;
                 for (let x = startX; x !== endX; x += stepX) {
                     const idx = (y * width + x) * 4; 
-                    const j = (y * width + x) * 3;
+                    const j = (y * width + x) * D;
                     if (pixels[idx + 3] < 128) continue;
                     
                     const old0 = wbuf[j], old1 = wbuf[j+1], old2 = wbuf[j+2];
                     
-                    // Clamp to RGB Gamut boundaries to strictly prevent mathematically runaway accumulation
                     const [origR, origG, origB] = Converter.from(old0/w0, old1/w1, old2/w2);
                     const cR = clamp(origR, 0, 255);
                     const cG = clamp(origG, 0, 255);
@@ -565,7 +688,7 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                     const safe1 = t1 * w1;
                     const safe2 = t2 * w2;
                     
-                    const nearest = getNearestColor(safe0, safe1, safe2);
+                    const nearest = getNearestColor([safe0, safe1, safe2]);
                     if (nearest) {
                         pixels[idx] = nearest.displayR; pixels[idx+1] = nearest.displayG; pixels[idx+2] = nearest.displayB;
                         
@@ -578,7 +701,7 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                         kernel.forEach(k => {
                             const dx = isRev ? -k.x : k.x, dy = k.y; 
                             if (x + dx >= 0 && x + dx < width && y + dy < height) {
-                                const nIdx = ((y + dy) * width + (x + dx)) * 3;
+                                const nIdx = ((y + dy) * width + (x + dx)) * D;
                                 wbuf[nIdx] += err0 * k.f; wbuf[nIdx+1] += err1 * k.f; wbuf[nIdx+2] += err2 * k.f;
                             }
                         });
@@ -595,7 +718,7 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const idx = (y * width + x) * 4; 
-                const j = (y * width + x) * 3;
+                const j = (y * width + x) * D;
                 if (pixels[idx + 3] < 128) continue;
                 
                 const v0 = wbuf[j], v1 = wbuf[j+1], v2 = wbuf[j+2];
@@ -628,7 +751,7 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const idx = (y * width + x) * 4;
-                const j = (y * width + x) * 3;
+                const j = (y * width + x) * D;
                 if (pixels[idx+3] < 128) continue;
                 
                 let v0 = wbuf[j], v1 = wbuf[j+1], v2 = wbuf[j+2];
@@ -638,7 +761,7 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                     let g0 = v0, g1 = v1, g2 = v2;
                     const candidates = [];
                     for (let n = 0; n < validNCandidates; n++) {
-                        const nearest = getNearestColor(g0, g1, g2);
+                        const nearest = getNearestColor([g0, g1, g2]);
                         candidates.push(nearest);
                         if (nearest) {
                             g0 += (v0 - nearest.transformed[0]); 
@@ -652,7 +775,8 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                     if (chosen) { pixels[idx] = chosen.displayR; pixels[idx+1] = chosen.displayG; pixels[idx+2] = chosen.displayB; }
                 } 
                 else if (ditherSubMethod === 'fw-dither') {
-                    runFW(v0, v1, v2);
+                    const vArr = wbuf.subarray(j, j + D);
+                    runFW(vArr);
                     let accum = 0;
                     let chosen = workingPalette[0];
                     for (let p = 0; p < workingPalette.length; p++) {
@@ -664,7 +788,7 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                     if (chosen) { pixels[idx] = chosen.displayR; pixels[idx+1] = chosen.displayG; pixels[idx+2] = chosen.displayB; }
                 }
                 else if (ditherSubMethod === 'n-closest') {
-                    const candidates = getNNearestColors(v0, v1, v2, validNCandidates);
+                    const candidates = getNNearestColors([v0, v1, v2], validNCandidates);
                     let sumWeights = 0;
                     candidates.forEach(c => { c.weight = 1.0 / Math.pow(Math.max(c.dist, 0.001), safeDistExp); sumWeights += c.weight; });
                     let accum = 0; let chosen = candidates[0]?.color;
@@ -678,7 +802,7 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                     let g0 = v0, g1 = v1, g2 = v2;
                     const candidates = [];
                     for (let n = 0; n < validNCandidates; n++) {
-                        const nearest = getNearestColor(g0, g1, g2);
+                        const nearest = getNearestColor([g0, g1, g2]);
                         if (nearest) {
                             const d0 = v0 - nearest.transformed[0], d1 = v1 - nearest.transformed[1], d2 = v2 - nearest.transformed[2];
                             candidates.push({color: nearest, dist: d0*d0 + d1*d1 + d2*d2});
@@ -720,7 +844,7 @@ const getThemeStyles = (isDark) => ({
     segmentGroup: `flex p-0.5 gap-0.5 border ${isDark ? 'bg-neutral-950 border-neutral-800' : 'bg-neutral-100 border-neutral-200'}`,
     segmentButton: (isActive) => `flex-1 py-1 text-xs font-bold uppercase tracking-tighter transition-all ${isActive ? (isDark ? 'bg-neutral-700 text-white shadow-sm' : 'bg-white text-neutral-900 shadow-sm') : (isDark ? 'text-neutral-500 hover:text-neutral-300' : 'text-neutral-500 hover:text-neutral-900')}`,
     toolbar: `absolute bottom-6 left-1/2 transform -translate-x-1/2 backdrop-blur-md shadow-xl border z-40 transition-all ${isDark ? 'bg-neutral-900/90 border-neutral-700 text-neutral-200' : 'bg-white/90 border-neutral-200 text-neutral-700'}`,
-    popover: `fixed z-50 shadow-2xl p-3 border ${isDark ? 'bg-neutral-900 border-neutral-700' : 'bg-white border-neutral-200'}`,
+    popover: `fixed z-50 shadow-2xl p-4 border ${isDark ? 'bg-neutral-900 border-neutral-700' : 'bg-white border-neutral-200'}`,
     divider: `w-full h-px ${isDark ? 'bg-neutral-800' : 'bg-neutral-200'}`,
     section: `flex flex-col gap-2.5`
 });
@@ -777,13 +901,15 @@ const StepperInput = ({ value, onDecrease, onIncrease, onChange, onBlur, onKeyDo
 // ==========================================
 
 const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
-    const [activeCategory, setActiveCategory] = useState("Handhelds");
-    const [activeDevice, setActiveDevice] = useState("Game Boy");
-    if (!isOpen) return null;
     const categories = Object.keys(PRESET_PALETTES);
-    const devices = Object.keys(PRESET_PALETTES[activeCategory]);
-    const safeDevice = devices.includes(activeDevice) ? activeDevice : devices[0];
-    const palettes = PRESET_PALETTES[activeCategory][safeDevice];
+    const [activeCategory, setActiveCategory] = useState(categories[0]);
+
+    if (!isOpen) return null;
+    
+    const safeCategory = categories.includes(activeCategory) ? activeCategory : categories[0];
+    const categoryData = PRESET_PALETTES[safeCategory];
+    const paletteNames = Object.keys(categoryData).filter(k => k !== '_source');
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
             <div className={`${styles.popover} w-full max-w-lg flex flex-col shadow-2xl`} style={{ maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
@@ -791,19 +917,26 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                     <div className="flex items-center gap-2"><Library className="w-4 h-4 text-neutral-500" /><span className="text-xs font-bold uppercase tracking-wider">Palette Library</span></div>
                     <button onClick={onClose} className={`hover:text-neutral-600 ${isDark ? 'text-neutral-400 hover:text-neutral-200' : 'text-neutral-400'}`}><X size={16} /></button>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2 mb-4">
-                    <Select styles={styles} value={activeCategory} onChange={e => { setActiveCategory(e.target.value); setActiveDevice(Object.keys(PRESET_PALETTES[e.target.value])[0]); }} options={categories.map(c => ({value: c, label: c}))} />
-                    <Select styles={styles} value={safeDevice} onChange={e => setActiveDevice(e.target.value)} options={devices.map(d => ({value: d, label: d}))} />
+                <div className="flex flex-col mb-4">
+                    <Select styles={styles} value={safeCategory} onChange={e => setActiveCategory(e.target.value)} options={categories.map(c => ({value: c, label: c}))} />
+                    {categoryData._source && (
+                        <p className={`text-xs mt-2 italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                            Source: {categoryData._source}
+                        </p>
+                    )}
                 </div>
                 <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
-                    {Object.entries(palettes).map(([name, colors]) => (
-                        <div key={name} className={`border p-3 cursor-pointer transition-all ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'}`} onClick={() => onApply(colors)}>
-                            <div className="text-xs font-bold mb-2 flex justify-between"><span className={isDark ? 'text-neutral-300' : 'text-neutral-700'}>{name}</span><span className="text-neutral-500">{colors.length} colors</span></div>
-                            <div className={`grid gap-0 overflow-hidden shadow-sm border border-transparent`} style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(8, 100/colors.length)}%, 1fr))`, height: colors.length > 32 ? '64px' : '32px' }}>
-                                {colors.map((c, i) => <div key={i} style={{backgroundColor: c, width: '100%', height: '100%'}}></div>)}
+                    {paletteNames.map((name) => {
+                        const colors = categoryData[name];
+                        return (
+                            <div key={name} className={`border p-3 cursor-pointer transition-all ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'}`} onClick={() => onApply(colors)}>
+                                <div className="text-xs font-bold mb-2 flex justify-between"><span className={isDark ? 'text-neutral-300' : 'text-neutral-700'}>{name}</span><span className="text-neutral-500">{colors.length} colors</span></div>
+                                <div className={`grid gap-0 overflow-hidden shadow-sm border border-transparent`} style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(4, 100/colors.length)}%, 1fr))`, height: colors.length > 32 ? '64px' : '32px' }}>
+                                    {colors.map((c, i) => <div key={i} style={{backgroundColor: c, width: '100%', height: '100%'}}></div>)}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </div>
@@ -811,7 +944,7 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
 };
 
 const ImageSetupPanel = ({ styles, isDark, settings, updateSetting, imageLoaded, onResetOriginalSize, isAnimation, isVideo }) => {
-    const showMatchMethod = settings.ditherCategory !== 'pattern' && settings.ditherSubMethod !== 'linear-projection' && settings.ditherSubMethod !== 'fw-dither';
+    const showMatchMethod = settings.ditherCategory !== 'pattern' && settings.ditherSubMethod !== 'linear-projection' && settings.ditherSubMethod !== 'fw-dither' && settings.ditherSubMethod !== 'paper-beer-lambert' && settings.ditherSubMethod !== 'paper-mixbox';
     return (
         <PanelSection styles={styles} title="Image Setup" action={
             imageLoaded ? <button onClick={onResetOriginalSize} className="text-xs uppercase font-bold text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 flex items-center gap-1"><RotateCcw size={10} /> Original</button> : null
@@ -823,8 +956,13 @@ const ImageSetupPanel = ({ styles, isDark, settings, updateSetting, imageLoaded,
             <RangeSlider styles={styles} min={32} max={640} step={4} value={Math.min(settings.width, 640)} onChange={(e) => { const w = clamp(Number(e.target.value), 32, 5000); updateSetting('width', w); updateSetting('height', Math.round(w / settings.aspectRatio)); }} />
             {isAnimation && (
                 <div className="flex items-center justify-between pt-1">
-                    <span className="text-xs font-bold text-neutral-400 uppercase">Video Framerate</span>
-                    <Select styles={styles} className="w-24 py-1" value={settings.videoFps || 30} onChange={(e) => updateSetting('videoFps', Number(e.target.value))} options={[12,15,24,30,60].map(v => ({value: v, label: `${v} FPS`}))} />
+                    <span className="text-xs font-bold uppercase text-neutral-500">Video Framerate</span>
+                    <div className="flex items-center gap-1.5">
+                        {settings.originalFps && (
+                            <button onClick={() => updateSetting('videoFps', settings.originalFps)} className={`text-xs font-bold px-1.5 py-1 uppercase transition-colors rounded-sm ${settings.videoFps === settings.originalFps ? (isDark ? 'bg-neutral-800 text-white' : 'bg-neutral-200 text-black') : (isDark ? 'text-neutral-500 hover:text-white' : 'text-neutral-400 hover:text-black')}`} title="Reset to Original FPS">Orig.</button>
+                        )}
+                        <input type="number" min={1} max={120} value={settings.videoFps || 30} onChange={(e) => updateSetting('videoFps', clamp(Number(e.target.value), 1, 120))} className={`${styles.input} w-16`} />
+                    </div>
                 </div>
             )}
             <Select styles={styles} value={settings.colorSpace} onChange={(e) => updateSetting('colorSpace', e.target.value)} optgroups={{
@@ -859,6 +997,10 @@ const PalettePanel = ({ styles, isDark, settings, updateSetting, paletteData, on
     useEffect(() => setTempColorCount(settings.paletteSize.toString()), [settings.paletteSize]);
     const applyColorCount = (val) => { let num = clamp(parseInt(val) || 2, 2, 256); updateSetting('paletteSize', num); setTempColorCount(num.toString()); };
 
+    const EXPORT_OPTIONS = (settings.ditherCategory === 'analytical' && settings.ditherSubMethod !== 'best-match')
+        ? ['hex', 'json', 'gpl', 'zip: Color', 'zip: B&W']
+        : ['hex', 'json', 'gpl', 'zip: Cricut (Color)', 'zip: Cricut (B&W)', 'zip: Progressive (Color)', 'zip: Progressive (B&W)'];
+
     return (
         <PanelSection styles={styles} title="Palette">
             <div className="flex justify-between items-center">
@@ -871,8 +1013,8 @@ const PalettePanel = ({ styles, isDark, settings, updateSetting, paletteData, on
                     <div className="relative">
                         <IconButton styles={styles} icon={Save} onClick={() => setShowExportMenu(!showExportMenu)} title="Export Palette" />
                         {showExportMenu && (
-                            <div className={`absolute top-full left-0 mt-1 w-24 text-xs shadow-xl z-50 flex flex-col border ${isDark ? 'bg-neutral-800 border-neutral-700' : 'bg-white border-neutral-200'}`}>
-                                {['hex', 'json', 'gpl'].map(fmt => <button key={fmt} onClick={() => { onPaletteAction.export(fmt); setShowExportMenu(false); }} className={`px-3 py-2 text-left uppercase transition-colors ${isDark ? 'text-neutral-300 hover:bg-neutral-700' : 'text-neutral-700 hover:bg-neutral-100'}`}>{fmt}</button>)}
+                            <div className={`absolute top-full left-0 mt-1 w-56 text-xs shadow-xl z-50 flex flex-col border ${isDark ? 'bg-neutral-800 border-neutral-700' : 'bg-white border-neutral-200'}`}>
+                                {EXPORT_OPTIONS.map(fmt => <button key={fmt} onClick={() => { onPaletteAction.export(fmt); setShowExportMenu(false); }} className={`px-3 py-2 text-left uppercase transition-colors ${isDark ? 'text-neutral-300 hover:bg-neutral-700' : 'text-neutral-700 hover:bg-neutral-100'}`}>{fmt}</button>)}
                             </div>
                         )}
                     </div>
@@ -891,8 +1033,22 @@ const PalettePanel = ({ styles, isDark, settings, updateSetting, paletteData, on
             <div className={styles.segmentGroup}>{[2, 4, 8, 16, 32, 64, 128, 256].map(p => <button key={p} onClick={() => applyColorCount(p)} className={styles.segmentButton(settings.paletteSize === p)}>{p}</button>)}</div>
             <div className="grid grid-cols-10 gap-0.5 max-h-40 overflow-y-auto custom-scrollbar">
                 {paletteData.displayed.map((color, i) => (
-                    <div key={color.id || i} onClick={(e) => onPaletteAction.clickSwatch(color.id, e)} className={`aspect-square border cursor-pointer relative ${color.locked ? 'ring-1 ring-inset ring-white/50 border-neutral-900' : 'border-transparent'}`} style={{ backgroundColor: rgbToHex(color.displayR, color.displayG, color.displayB) }}>
-                        {color.locked && <div className="absolute inset-0 flex items-center justify-center opacity-30"><Lock size={8} className="text-white" /></div>}
+                    <div 
+                        key={color.id || i} 
+                        onClick={(e) => {
+                            e.preventDefault();
+                            if (color.locked) onPaletteAction.deleteColor(color.id);
+                            else onPaletteAction.toggleLock(color.id);
+                        }}
+                        onContextMenu={(e) => {
+                            e.preventDefault();
+                            onPaletteAction.openEditor(color.id, e.currentTarget);
+                        }}
+                        className={`aspect-square border cursor-pointer relative ${color.locked ? 'ring-1 ring-inset ring-white/50 border-neutral-900' : 'border-transparent'}`} 
+                        style={{ backgroundColor: rgbToHex(color.displayR, color.displayG, color.displayB) }}
+                        title={color.locked ? "Click to delete. Right-click to edit." : "Click to lock. Right-click to edit."}
+                    >
+                        {color.locked && <div className="absolute inset-0 flex items-center justify-center opacity-30"><Lock size={8} className="text-white drop-shadow-md" /></div>}
                     </div>
                 ))}
             </div>
@@ -904,19 +1060,19 @@ const DITHER_CATEGORIES = {
     'bayer': 'pattern', 'halftone': 'pattern', 'blue-noise': 'pattern',
     'floyd': 'flow', 'atkinson': 'flow', 'sierra': 'flow', 'sierra-lite': 'flow', 'stucki': 'flow', 'burkes': 'flow', 'ostromoukhov': 'flow', 'riemersma': 'flow',
     'knoll': 'geometric', 'n-closest': 'geometric', 'n-convex': 'geometric', 'fw-dither': 'geometric',
-    'best-match': 'analytical', 'linear-projection': 'analytical'
+    'best-match': 'analytical', 'linear-projection': 'analytical', 'paper-beer-lambert': 'analytical', 'paper-mixbox': 'analytical'
 };
 
 const DitheringPanel = ({ styles, isDark, settings, updateSetting, paletteData, onPaletteAction }) => {
     const handleMethodChange = (e) => { const method = e.target.value; updateSetting('ditherSubMethod', method); updateSetting('ditherCategory', DITHER_CATEGORIES[method]); };
     return (
-        <PanelSection styles={styles} title="Dithering">
+        <PanelSection styles={styles} title="Mixing / Dithering">
             <div className="flex gap-2">
                 <Select styles={styles} value={settings.ditherSubMethod} onChange={handleMethodChange} optgroups={{
+                    "No Dither": [ {value: 'best-match', label: 'Best Match'}, {value: 'linear-projection', label: 'Linear Projection'}, {value: 'paper-beer-lambert', label: 'Paper (Beer-Lambert)'}, {value: 'paper-mixbox', label: 'Paper (Mixbox)'} ],
                     "Ordered": [ {value: 'bayer', label: 'Bayer (Dispersed)'}, {value: 'halftone', label: 'Halftone (Clustered)'}, {value: 'blue-noise', label: 'Blue Noise'} ],
                     "Diffusion": [ {value: 'floyd', label: 'Floyd-Steinberg'}, {value: 'atkinson', label: 'Atkinson'}, {value: 'sierra', label: 'Sierra (3-row)'}, {value: 'sierra-lite', label: 'Sierra Lite'}, {value: 'stucki', label: 'Stucki'}, {value: 'burkes', label: 'Burkes'}, {value: 'ostromoukhov', label: 'Ostromoukhov'}, {value: 'riemersma', label: 'Riemersma'} ],
-                    "Geometric": [ {value: 'knoll', label: 'Thomas Knoll'}, {value: 'n-closest', label: "N-Closest (Shepard's)"}, {value: 'n-convex', label: 'N-Convex'}, {value: 'fw-dither', label: 'Linear Projection (NNLS)'} ],
-                    "No Dither": [ {value: 'best-match', label: 'Best Match'}, {value: 'linear-projection', label: 'Linear Projection'} ]
+                    "Geometric": [ {value: 'knoll', label: 'Thomas Knoll'}, {value: 'n-closest', label: "N-Closest (Shepard's)"}, {value: 'n-convex', label: 'N-Convex'}, {value: 'fw-dither', label: 'Linear Projection (NNLS)'} ]
                 }} />
                 {settings.ditherCategory === 'flow' && settings.ditherSubMethod !== 'riemersma' && <IconButton styles={styles} icon={WrapText} onClick={() => updateSetting('serpentine', !settings.serpentine)} title="Serpentine Scanning" className={`border ${settings.serpentine ? (isDark ? 'bg-neutral-800 border-neutral-400' : 'bg-neutral-200 border-neutral-400') : 'border-neutral-300 dark:border-neutral-700'}`} />}
                 {settings.ditherCategory === 'pattern' && settings.ditherSubMethod === 'halftone' && paletteData.displayed.some(c => c.locked) && <IconButton styles={styles} icon={Dices} onClick={() => onPaletteAction.randomizeOffsets()} title="Randomize All Offsets" className={`border border-neutral-300 dark:border-neutral-700`} />}
@@ -931,31 +1087,37 @@ const DitheringPanel = ({ styles, isDark, settings, updateSetting, paletteData, 
     );
 };
 
-const ColorEditor = ({ color, onClose, position, onUpdateLogic, onUpdatePaint, onToggleLock, isLinked, onToggleLink, onUpdateOffset, styles, isDark, settings }) => {
+const ColorEditor = ({ color, onClose, onDelete, position, onUpdateLogic, onUpdatePaint, onToggleLock, isLinked, onToggleLink, onUpdateOffset, styles, isDark, settings }) => {
     if (!color) return null;
     const logicHex = rgbToHex(color.r, color.g, color.b); const paintHex = rgbToHex(color.displayR, color.displayG, color.displayB);
     return (
-        <div className={styles.popover} style={{ top: position.top, left: position.left, width: '13rem' }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-3"><span className="text-xs font-bold text-neutral-400 uppercase">Edit Color</span><button onClick={onClose} className="text-neutral-400 hover:text-neutral-600"><X size={14} /></button></div>
-            <div className="flex items-center justify-between gap-2">
-                <div className="flex flex-col items-center gap-1"><div className="relative w-12 h-12 border overflow-hidden shadow-inner"><div className="absolute inset-0" style={{background: logicHex}}></div><input type="color" value={logicHex} onChange={(e) => onUpdateLogic(color.id, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" /></div><span className="text-xs text-neutral-500">{logicHex}</span></div>
-                <button onClick={onToggleLink} className={isLinked ? 'text-neutral-400' : 'text-neutral-200'}>{isLinked ? <LinkIcon size={14} /> : <Unlink size={14} />}</button>
-                <div className="flex flex-col items-center gap-1"><div className="relative w-12 h-12 border overflow-hidden shadow-inner"><div className="absolute inset-0" style={{background: paintHex}}></div><input type="color" value={paintHex} onChange={(e) => onUpdatePaint(color.id, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" /></div><span className="text-xs text-neutral-500">{paintHex}</span></div>
+        <div className={`${styles.popover} !p-3 flex flex-col gap-2`} style={{ top: position.top, left: position.left, width: '11rem' }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-neutral-400 uppercase">Edit Color</span>
+                <div className="flex items-center gap-1.5">
+                    <button onClick={() => onDelete(color.id)} className={`hover:text-red-500 transition-colors ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`} title="Delete Color"><Trash size={14} /></button>
+                    <button onClick={onClose} className={`hover:text-neutral-800 transition-colors ${isDark ? 'text-neutral-500 hover:text-white' : 'text-neutral-400'}`}><X size={14} /></button>
+                </div>
             </div>
-            <div className={styles.divider}></div>
+            <div className="flex items-center justify-center gap-4">
+                <div className="flex flex-col items-center gap-1"><div className="relative w-10 h-10 border overflow-hidden shadow-inner"><div className="absolute inset-0" style={{background: logicHex}}></div><input type="color" value={logicHex} onChange={(e) => onUpdateLogic(color.id, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" /></div><span className="text-[10px] text-neutral-500 font-mono">{logicHex}</span></div>
+                <button onClick={onToggleLink} className={isLinked ? 'text-neutral-400' : 'text-neutral-200'}>{isLinked ? <LinkIcon size={14} /> : <Unlink size={14} />}</button>
+                <div className="flex flex-col items-center gap-1"><div className="relative w-10 h-10 border overflow-hidden shadow-inner"><div className="absolute inset-0" style={{background: paintHex}}></div><input type="color" value={paintHex} onChange={(e) => onUpdatePaint(color.id, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" /></div><span className="text-[10px] text-neutral-500 font-mono">{paintHex}</span></div>
+            </div>
+            <div className={`${styles.divider} my-0.5`}></div>
             {color.locked && settings.ditherCategory === 'pattern' && (
-                <div className="flex flex-col gap-1 mb-3">
+                <div className="flex flex-col gap-1 mb-0.5">
                     <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-neutral-400 uppercase">Pattern Offset</span>
-                        {settings.ditherSubMethod === 'halftone' && <button onClick={() => onUpdateOffset(color.id, Math.floor(Math.random() * 32), Math.floor(Math.random() * 32))} className={`hover:text-neutral-900 transition-colors ${isDark ? 'text-neutral-500 dark:hover:text-white' : 'text-neutral-400'}`} title="Randomize Offset"><Dices size={12} /></button>}
+                        <span className="text-[10px] font-bold text-neutral-400 uppercase">Offset</span>
+                        {settings.ditherSubMethod === 'halftone' && <button onClick={() => onUpdateOffset(color.id, Math.floor(Math.random() * 32), Math.floor(Math.random() * 32))} className={`hover:text-neutral-900 transition-colors ${isDark ? 'text-neutral-500 dark:hover:text-white' : 'text-neutral-400'}`} title="Randomize Offset"><Dices size={10} /></button>}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                         <NumberInput label="X" value={color.offsetX || 0} onChange={e => onUpdateOffset(color.id, e.target.value, undefined)} styles={styles} />
                         <NumberInput label="Y" value={color.offsetY || 0} onChange={e => onUpdateOffset(color.id, undefined, e.target.value)} styles={styles} />
                     </div>
                 </div>
             )}
-            <button onClick={(e) => onToggleLock(color.id, e)} className={`w-full py-1.5 text-xs font-bold uppercase transition-all ${color.locked ? 'bg-neutral-800 text-white' : 'bg-neutral-200 text-neutral-600'}`}>{color.locked ? 'Locked' : 'Unlocked'}</button>
+            <button onClick={(e) => onToggleLock(color.id, e)} className={`w-full py-1 text-[10px] font-bold uppercase transition-all ${color.locked ? 'bg-neutral-800 text-white' : 'bg-neutral-200 text-neutral-600'}`}>{color.locked ? 'Locked' : 'Unlocked'}</button>
         </div>
     );
 };
@@ -1021,10 +1183,24 @@ const FloatingToolbar = ({ styles, isDark, zoom, setZoom, isComparing, onCompare
 
 export default function App() {
   const [isDark, setIsDark] = useState(false);
+  const [mixboxLoaded, setMixboxLoaded] = useState(false);
+
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)'); setIsDark(mediaQuery.matches);
     const handler = (e) => setIsDark(e.matches); mediaQuery.addEventListener('change', handler);
     return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+      if (window.mixbox) { setMixboxLoaded(true); return; }
+      if (document.getElementById('mixbox-script')) return;
+      const script = document.createElement('script');
+      script.id = 'mixbox-script';
+      script.src = 'https://cdn.jsdelivr.net/gh/scrtwpns/mixbox@master/js/mixbox.js';
+      script.async = true;
+      script.onload = () => setMixboxLoaded(true);
+      script.onerror = () => console.warn("Failed to load Mixbox");
+      document.body.appendChild(script);
   }, []);
 
   const styles = useMemo(() => getThemeStyles(isDark), [isDark]);
@@ -1049,7 +1225,7 @@ export default function App() {
       paletteSize: 4, contrastAnchoring: false, genSeed: 0, sortMode: 'impact',
       ditherCategory: 'pattern', ditherSubMethod: 'bayer', dithering: 0.15, bayerSize: 2, 
       serpentine: false, nCandidates: 4, distanceExponent: 2.0, riemersmaHistory: 16, ditherSeed: 0,
-      videoFps: 30
+      videoFps: 30, originalFps: null
   });
 
   const updateSetting = useCallback((key, value) => { setSettings(prev => ({ ...prev, [key]: value })); }, []);
@@ -1130,7 +1306,8 @@ export default function App() {
       lastSourceInfoRef.current = { w, h };
       const ar = w / h;
       const initialWidth = Math.min(w, 360);
-      setSettings(s => ({ ...s, aspectRatio: ar, width: initialWidth, height: Math.round(initialWidth / ar) }));
+      const targetWidth = initialWidth;
+      const targetHeight = Math.round(initialWidth / ar);
       
       const frames = [];
       let prevCanvas = null;
@@ -1159,12 +1336,19 @@ export default function App() {
           prevCanvas = frameCanvas;
       }
       
+      let totalDelay = 0;
+      frames.forEach(f => { totalDelay += Math.max(2, f.delay) * 10; });
+      const avgDelayMs = totalDelay / frameCount;
+      const avgFps = Math.max(1, Math.round(1000 / avgDelayMs));
+      
       gifFramesRef.current = frames;
       setIsGif(true);
       setIsVideo(false);
       setGifTotalFrames(frameCount);
       setGifCurrentFrame(0);
       setViewState(v => ({ ...v, isFit: true }));
+      setSettings(s => ({ ...s, aspectRatio: ar, width: initialWidth, height: Math.round(initialWidth / ar), videoFps: avgFps, originalFps: avgFps }));
+      
       // Wait for next tick to ensure settings propagation before extracting
       setTimeout(() => extractFrameFromSource(frames[0].canvas), 50);
   };
@@ -1204,7 +1388,7 @@ export default function App() {
           lastSourceInfoRef.current = { w: img.width, h: img.height };
           const initialWidth = Math.min(img.width, 360);
           const initialHeight = Math.round(initialWidth / ar);
-          setSettings(s => ({ ...s, aspectRatio: ar, width: initialWidth, height: initialHeight })); 
+          setSettings(s => ({ ...s, aspectRatio: ar, width: initialWidth, height: initialHeight, originalFps: null })); 
           setImageSrc(img.src); 
           setViewState(v => ({ ...v, isFit: true }));
           setTimeout(() => extractFrameFromSource(img), 0);
@@ -1278,6 +1462,8 @@ export default function App() {
       
       const w = settingsRef.current.width; const h = settingsRef.current.height;
       const frames = gifFramesRef.current;
+      const fps = settingsRef.current.videoFps || 30;
+      const delay = Math.max(2, Math.round(100 / fps));
       
       // Directly translate active specific Palette to GIF Palette
       const customPalette = activePaletteRef.current.map(c => (c.displayR << 16) | (c.displayG << 8) | c.displayB);
@@ -1330,7 +1516,7 @@ export default function App() {
           
           const options = {
               palette: paletteToUse,
-              delay: Math.max(2, Math.round(frames[i].delay / 10)),
+              delay: Math.max(2, Math.round(100 / (settingsRef.current.videoFps || 30))),
               disposal: frames[i].disposal || 1
           };
           if (hasTransparency) options.transparent = transparentIndex;
@@ -1436,6 +1622,296 @@ export default function App() {
       }));
   }, []);
 
+  const handleExportLayers = async (style, mode) => {
+      if (!sourceDataRef.current || !canvasRef.current || activePaletteRef.current.length === 0) return;
+      setIsRenderingVideo(true); setRenderPhase('Generating Layers'); setRenderProgress(0);
+      try {
+          const JSZipModule = await import('https://esm.sh/jszip');
+          const JSZip = JSZipModule.default || JSZipModule;
+          const zip = new JSZip();
+          const { width, height, pixels: srcPixels } = sourceDataRef.current;
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+
+          const isLinear = settingsRef.current.ditherSubMethod === 'linear-projection';
+          const isBeerLambert = settingsRef.current.ditherSubMethod === 'paper-beer-lambert';
+          const isMixbox = settingsRef.current.ditherSubMethod === 'paper-mixbox';
+          const mixboxReady = isMixbox && window.mixbox && window.mixbox.LATENT_SIZE;
+          const isProjection = isLinear || isBeerLambert || isMixbox;
+          
+          const D = mixboxReady ? window.mixbox.LATENT_SIZE : 3;
+          const P = activePaletteRef.current.length;
+
+          let csvContent = "Layer,Hex,R,G,B\n";
+          activePaletteRef.current.forEach((c, i) => {
+              const hex = rgbToHex(c.displayR, c.displayG, c.displayB);
+              const layerNum = String(i + 1).padStart(3, '0');
+              csvContent += `${layerNum},${hex},${c.displayR},${c.displayG},${c.displayB}\n`;
+          });
+          zip.file("palette.csv", csvContent);
+
+          if (isProjection) {
+              const layerWeights = Array.from({length: P}, () => new Float32Array(width * height));
+              const Converter = ColorSpaceConverter[settingsRef.current.colorSpace];
+              const w0 = settingsRef.current.colorSpace === 'srgb' || settingsRef.current.colorSpace === 'linear' ? Math.sqrt(settingsRef.current.manualWeights.r) : 1;
+              const w1 = settingsRef.current.colorSpace === 'srgb' || settingsRef.current.colorSpace === 'linear' ? Math.sqrt(settingsRef.current.manualWeights.g) : 1;
+              const w2 = settingsRef.current.colorSpace === 'srgb' || settingsRef.current.colorSpace === 'linear' ? Math.sqrt(settingsRef.current.manualWeights.b) : 1;
+
+              const workingPalette = activePaletteRef.current.map(p => {
+                  if (isBeerLambert) {
+                      const [lr, lg, lb] = ColorSpaceConverter.linear.to(p.r, p.g, p.b);
+                      return { ...p, transformed: [-Math.log(Math.max(lr, 0.001)), -Math.log(Math.max(lg, 0.001)), -Math.log(Math.max(lb, 0.001))] };
+                  }
+                  if (mixboxReady) {
+                      return { ...p, transformed: window.mixbox.rgbToLatent([p.r, p.g, p.b]) };
+                  }
+                  const [v0, v1, v2] = Converter.to(p.r, p.g, p.b);
+                  return { ...p, transformed: [v0 * w0, v1 * w1, v2 * w2] };
+              });
+
+              if (mixboxReady) {
+                  workingPalette.push({
+                      isWhitePaper: true,
+                      transformed: window.mixbox.rgbToLatent([255, 255, 255])
+                  });
+              }
+
+              const fwWeights = new Float32Array(workingPalette.length);
+              const fwCurrentPos = new Float32Array(D);
+              const fwError = new Float32Array(D);
+              const fwDelta = new Float32Array(D);
+
+              const runFW = (vArr) => {
+                  const W_P = workingPalette.length;
+                  fwWeights.fill(0);
+                  
+                  let bestStartIdx = 0, minDist = Infinity;
+                  for (let p = 0; p < W_P; p++) {
+                      const c = workingPalette[p].transformed;
+                      let d = 0;
+                      for (let k = 0; k < D; k++) d += (c[k] - vArr[k]) * (c[k] - vArr[k]);
+                      if (d < minDist) { minDist = d; bestStartIdx = p; }
+                  }
+
+                  fwWeights[bestStartIdx] = 1.0;
+                  const startC = workingPalette[bestStartIdx].transformed;
+                  for (let k = 0; k < D; k++) fwCurrentPos[k] = startC[k];
+
+                  for (let iter = 0; iter < 15; iter++) {
+                      for (let k = 0; k < D; k++) fwError[k] = fwCurrentPos[k] - vArr[k];
+
+                      let minDot = Infinity, bestIdx = -1;
+                      for (let p = 0; p < W_P; p++) {
+                          const c = workingPalette[p].transformed;
+                          let dot = 0;
+                          for (let k = 0; k < D; k++) dot += c[k] * fwError[k];
+                          if (dot < minDot) { minDot = dot; bestIdx = p; }
+                      }
+
+                      let deltaSq = 0;
+                      const targetC = workingPalette[bestIdx].transformed;
+                      for (let k = 0; k < D; k++) {
+                          fwDelta[k] = targetC[k] - fwCurrentPos[k];
+                          deltaSq += fwDelta[k] * fwDelta[k];
+                      }
+
+                      if (deltaSq < 1e-6) break;
+
+                      let errDotDelta = 0;
+                      for (let k = 0; k < D; k++) errDotDelta += fwError[k] * fwDelta[k];
+
+                      const gamma = clamp(-errDotDelta / deltaSq, 0, 1);
+                      if (gamma === 0) break;
+
+                      for (let k = 0; k < D; k++) fwCurrentPos[k] += gamma * fwDelta[k];
+                      for (let p = 0; p < W_P; p++) fwWeights[p] *= (1 - gamma);
+                      fwWeights[bestIdx] += gamma;
+                  }
+              };
+
+              const runBoundedCD = (vArr) => {
+                  const W_P = workingPalette.length;
+                  fwWeights.fill(0);
+                  for (let k = 0; k < D; k++) fwError[k] = -vArr[k];
+
+                  for (let iter = 0; iter < 20; iter++) {
+                      let maxChange = 0;
+                      for (let p = 0; p < W_P; p++) {
+                          const c = workingPalette[p].transformed;
+                          let AkSq = 0;
+                          for (let k = 0; k < D; k++) AkSq += c[k] * c[k];
+                          if (AkSq < 1e-6) continue;
+
+                          let dot = 0;
+                          for (let k = 0; k < D; k++) dot += fwError[k] * c[k];
+                          const delta = -dot / AkSq;
+
+                          const oldW = fwWeights[p];
+                          const newW = clamp(oldW + delta, 0, 1);
+                          const actualChange = newW - oldW;
+
+                          if (Math.abs(actualChange) > 1e-5) {
+                              fwWeights[p] = newW;
+                              for (let k = 0; k < D; k++) fwError[k] += actualChange * c[k];
+                              if (Math.abs(actualChange) > maxChange) maxChange = Math.abs(actualChange);
+                          }
+                      }
+                      if (maxChange < 1e-4) break;
+                  }
+              };
+
+              for (let i = 0, pIdx=0; i < srcPixels.length; i += 4, pIdx++) {
+                  if (srcPixels[i+3] < 128) continue;
+                  
+                  let vArr;
+                  if (isBeerLambert) {
+                      const [lr, lg, lb] = ColorSpaceConverter.linear.to(srcPixels[i], srcPixels[i+1], srcPixels[i+2]);
+                      vArr = [-Math.log(Math.max(lr, 0.001)), -Math.log(Math.max(lg, 0.001)), -Math.log(Math.max(lb, 0.001))];
+                  } else if (mixboxReady) {
+                      vArr = window.mixbox.rgbToLatent([srcPixels[i], srcPixels[i+1], srcPixels[i+2]]);
+                  } else {
+                      const [v0Raw, v1Raw, v2Raw] = Converter.to(srcPixels[i], srcPixels[i+1], srcPixels[i+2]);
+                      vArr = [v0Raw * w0, v1Raw * w1, v2Raw * w2];
+                  }
+
+                  if (isBeerLambert) {
+                      runBoundedCD(vArr);
+                  } else {
+                      runFW(vArr);
+                  }
+
+                  // Note: Always loop to P so it ignores the white paper base if it was added implicitly
+                  for (let p = 0; p < P; p++) layerWeights[p][pIdx] = fwWeights[p];
+              }
+
+              for (let p = 0; p < P; p++) {
+                  const imgData = new ImageData(width, height);
+                  const targetC = activePaletteRef.current[p];
+                  for (let i = 0; i < width * height; i++) {
+                      const val = clamp(Math.round(layerWeights[p][i] * 255), 0, 255);
+                      if (mode === 'color') {
+                          imgData.data[i*4] = targetC.displayR;
+                          imgData.data[i*4+1] = targetC.displayG;
+                          imgData.data[i*4+2] = targetC.displayB;
+                          imgData.data[i*4+3] = srcPixels[i*4+3] < 128 ? 0 : val;
+                      } else {
+                          imgData.data[i*4] = val;
+                          imgData.data[i*4+1] = val;
+                          imgData.data[i*4+2] = val;
+                          imgData.data[i*4+3] = srcPixels[i*4+3] < 128 ? 0 : 255;
+                      }
+                  }
+                  ctx.putImageData(imgData, 0, 0);
+                  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+                  const hex = rgbToHex(activePaletteRef.current[p].displayR, activePaletteRef.current[p].displayG, activePaletteRef.current[p].displayB);
+                  zip.file(`${String(p+1).padStart(3, '0')}-${hex.substring(1)}.png`, blob);
+                  setRenderProgress((p + 1) / P);
+              }
+          } else if (style === 'progressive') {
+              for (let p = 0; p < P; p++) {
+                  const tempPalette = activePaletteRef.current.slice(0, p + 1);
+                  const tempCanvas = document.createElement('canvas');
+                  tempCanvas.width = width; tempCanvas.height = height;
+                  renderDitheredImage(tempCanvas, sourceDataRef.current, tempPalette, settingsRef.current);
+                  
+                  const tempCtx = tempCanvas.getContext('2d');
+                  const renderedPixels = tempCtx.getImageData(0, 0, width, height).data;
+                  const imgData = new ImageData(width, height);
+                  const targetC = activePaletteRef.current[p];
+                  
+                  for (let i = 0; i < renderedPixels.length; i += 4) {
+                      if (renderedPixels[i+3] < 128) continue;
+                      
+                      let isTarget = false;
+                      if (p === 0) {
+                          isTarget = true; 
+                      } else {
+                          const r = renderedPixels[i], g = renderedPixels[i+1], b = renderedPixels[i+2];
+                          if (r === targetC.displayR && g === targetC.displayG && b === targetC.displayB) isTarget = true;
+                      }
+                      
+                      if (isTarget) {
+                          if (mode === 'color') {
+                              imgData.data[i] = targetC.displayR; imgData.data[i+1] = targetC.displayG; imgData.data[i+2] = targetC.displayB; imgData.data[i+3] = 255;
+                          } else {
+                              imgData.data[i] = 0; imgData.data[i+1] = 0; imgData.data[i+2] = 0; imgData.data[i+3] = 255;
+                          }
+                      }
+                  }
+                  ctx.putImageData(imgData, 0, 0);
+                  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+                  const hex = rgbToHex(targetC.displayR, targetC.displayG, targetC.displayB);
+                  zip.file(`${String(p+1).padStart(3, '0')}-${hex.substring(1)}.png`, blob);
+                  setRenderProgress((p + 1) / P);
+              }
+          } else {
+              const renderedCtx = canvasRef.current.getContext('2d');
+              const renderedPixels = renderedCtx.getImageData(0, 0, width, height).data;
+
+              const colorMap = new Map();
+              activePaletteRef.current.forEach((c, i) => {
+                  const key = (c.displayR << 16) | (c.displayG << 8) | c.displayB;
+                  colorMap.set(key, i);
+              });
+
+              const pixelIndices = new Int32Array(width * height);
+              for (let i = 0; i < renderedPixels.length; i += 4) {
+                  if (renderedPixels[i+3] < 128) {
+                      pixelIndices[i/4] = -1;
+                  } else {
+                      const r = renderedPixels[i], g = renderedPixels[i+1], b = renderedPixels[i+2];
+                      const key = (r << 16) | (g << 8) | b;
+                      let idx = colorMap.get(key);
+                      if (idx === undefined) {
+                          let minDist = Infinity;
+                          for (let j = 0; j < P; j++) {
+                              const c = activePaletteRef.current[j];
+                              const dr = r - c.displayR, dg = g - c.displayG, db = b - c.displayB;
+                              const dist = dr*dr + dg*dg + db*db;
+                              if (dist < minDist) { minDist = dist; idx = j; }
+                          }
+                          colorMap.set(key, idx);
+                      }
+                      pixelIndices[i/4] = idx;
+                  }
+              }
+
+              for (let p = 0; p < P; p++) {
+                  const imgData = new ImageData(width, height);
+                  const targetC = activePaletteRef.current[p];
+                  for (let i = 0; i < width * height; i++) {
+                      const idx = pixelIndices[i];
+                      if (idx >= p) {
+                          if (mode === 'color') {
+                              imgData.data[i*4] = targetC.displayR; imgData.data[i*4+1] = targetC.displayG; imgData.data[i*4+2] = targetC.displayB; imgData.data[i*4+3] = 255;
+                          } else {
+                              imgData.data[i*4] = 0; imgData.data[i*4+1] = 0; imgData.data[i*4+2] = 0; imgData.data[i*4+3] = 255;
+                          }
+                      }
+                  }
+                  ctx.putImageData(imgData, 0, 0);
+                  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+                  const hex = rgbToHex(targetC.displayR, targetC.displayG, targetC.displayB);
+                  zip.file(`${String(p+1).padStart(3, '0')}-${hex.substring(1)}.png`, blob);
+                  setRenderProgress((p + 1) / P);
+              }
+          }
+
+          const zipBlob = await zip.generateAsync({ type: 'blob' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(zipBlob);
+          link.download = `color-layers-${style}-${mode}.zip`;
+          link.click();
+      } catch (e) {
+          console.error("Export layers failed", e);
+          alert("Failed to export layers. Check console.");
+      } finally {
+          setIsRenderingVideo(false);
+          setRenderPhase('');
+      }
+  };
+
   const handlePaletteImport = (e) => {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
@@ -1454,6 +1930,13 @@ export default function App() {
 
   const handlePaletteExport = (format) => {
       if (activePalette.length === 0) return;
+      if (format === 'zip: Cricut (Color)') { handleExportLayers('cricut', 'color'); return; }
+      if (format === 'zip: Cricut (B&W)') { handleExportLayers('cricut', 'bw'); return; }
+      if (format === 'zip: Progressive (Color)') { handleExportLayers('progressive', 'color'); return; }
+      if (format === 'zip: Progressive (B&W)') { handleExportLayers('progressive', 'bw'); return; }
+      if (format === 'zip: Color') { handleExportLayers('progressive', 'color'); return; }
+      if (format === 'zip: B&W') { handleExportLayers('progressive', 'bw'); return; }
+      
       let content = "", mimeType = "text/plain", extension = "txt";
       if (format === 'hex') { content = activePalette.map(c => rgbToHex(c.displayR, c.displayG, c.displayB)).join('\n'); extension = "hex"; } 
       else if (format === 'json') { content = JSON.stringify(activePalette.map(c => rgbToHex(c.displayR, c.displayG, c.displayB)), null, 2); mimeType = "application/json"; extension = "json"; } 
@@ -1519,7 +2002,33 @@ export default function App() {
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-6">
               <ImageSetupPanel styles={styles} isDark={isDark} settings={settings} updateSetting={updateSetting} imageLoaded={!!imageSrc} onResetOriginalSize={() => setSettings(s => ({...s, width: lastSourceInfoRef.current.w, height: lastSourceInfoRef.current.h}))} isAnimation={isVideo || isGif} isVideo={isVideo} />
               <div className={styles.divider}></div>
-              <PalettePanel styles={styles} isDark={isDark} settings={settings} updateSetting={updateSetting} paletteData={{ displayed: activePalette }} onPaletteAction={{ extractFromImage: (file) => processImageFile(file, 'palette'), toggleAllLocks: (locked) => { setActivePalette(prev => prev.map(c => ({...c, locked}))); setRecalcTrigger(n => n + 1); }, openLibrary: () => setIsLibraryOpen(true), import: handlePaletteImport, export: handlePaletteExport, randomizeOffsets: () => { setActivePalette(prev => prev.map(c => c.locked ? { ...c, offsetX: Math.floor(Math.random() * 32), offsetY: Math.floor(Math.random() * 32) } : c)); }, clickSwatch: (id, e) => { e.stopPropagation(); const rect = e.currentTarget.getBoundingClientRect(); setPickerPosition({ top: rect.top - 180, left: rect.left - 40 }); setPickerOpenId(id); } }} />
+              <PalettePanel 
+                  styles={styles} isDark={isDark} settings={settings} updateSetting={updateSetting} paletteData={{ displayed: activePalette }} 
+                  onPaletteAction={{ 
+                      extractFromImage: (file) => processImageFile(file, 'palette'), 
+                      toggleAllLocks: (locked) => { setActivePalette(prev => prev.map(c => ({...c, locked}))); setRecalcTrigger(n => n + 1); }, 
+                      openLibrary: () => setIsLibraryOpen(true), 
+                      import: handlePaletteImport, 
+                      export: handlePaletteExport, 
+                      randomizeOffsets: () => { setActivePalette(prev => prev.map(c => c.locked ? { ...c, offsetX: Math.floor(Math.random() * 32), offsetY: Math.floor(Math.random() * 32) } : c)); }, 
+                      deleteColor: (id) => {
+                          setActivePalette(prev => prev.filter(c => c.id !== id));
+                          setSettings(s => ({ ...s, paletteSize: Math.max(2, s.paletteSize - 1) }));
+                          setRecalcTrigger(n => n + 1);
+                      },
+                      toggleLock: (id) => {
+                          setActivePalette(prev => prev.map(c => c.id === id ? { ...c, locked: !c.locked } : c));
+                          setRecalcTrigger(n => n + 1);
+                      },
+                      openEditor: (id, target) => {
+                          const rect = target.getBoundingClientRect();
+                          const left = Math.max(10, Math.min(window.innerWidth - 220, rect.left - 40));
+                          const top = Math.max(10, rect.top - 200); 
+                          setPickerPosition({ top, left }); 
+                          setPickerOpenId(id);
+                      } 
+                  }} 
+              />
               <div className={styles.divider}></div>
               <DitheringPanel styles={styles} isDark={isDark} settings={settings} updateSetting={updateSetting} paletteData={{ displayed: activePalette }} onPaletteAction={{ randomizeOffsets: () => setActivePalette(prev => prev.map(c => c.locked ? { ...c, offsetX: Math.floor(Math.random() * 32), offsetY: Math.floor(Math.random() * 32) } : c)) }} />
           </div>
@@ -1586,7 +2095,27 @@ export default function App() {
         {imageSrc && <FloatingToolbar styles={styles} isDark={isDark} zoom={viewState.scale} setZoom={z => setViewState(v => ({...v, scale: typeof z === 'function' ? z(v.scale) : z, isFit: false}))} isComparing={isComparing} onCompareStart={() => setIsComparing(true)} onCompareEnd={() => setIsComparing(false)} onCenter={() => setViewState(v => ({...v, x: 0, y: 0}))} onOneToOne={() => setViewState(v => ({...v, scale: 1, x: 0, y: 0, isFit: false}))} onFit={() => setViewState(v => ({...v, isFit: true}))} onDownload={() => { const link = document.createElement('a'); link.download = (isVideo || isGif) ? 'pixel-frame.png' : 'pixel-art.png'; link.href = canvasRef.current.toDataURL(); link.click(); }} isAnimation={isVideo || isGif} isGif={isGif} gifTotalFrames={gifTotalFrames} gifCurrentFrame={gifCurrentFrame} onSeekGif={handleGifSeek} onRenderGif={handleRenderGif} isVideo={isVideo} videoDuration={videoDuration} videoCurrentTime={videoCurrentTime} onSeekVideo={handleVideoSeek} onRenderVideo={handleRenderVideo} settings={settings} />}
       </main>
       
-      {pickerOpenId && <ColorEditor color={activePalette.find(c => c.id === pickerOpenId)} onClose={() => setPickerOpenId(null)} position={pickerPosition} onUpdateLogic={(id, hex) => updateColor(id, hex, 'logic')} onUpdatePaint={(id, hex) => updateColor(id, hex, 'paint')} onToggleLock={(id) => { const np = [...activePalette]; const idx = np.findIndex(c => c.id === id); np[idx].locked = !np[idx].locked; setActivePalette(np); setRecalcTrigger(n => n + 1); }} isLinked={isColorsLinked} onToggleLink={() => setIsColorsLinked(!isColorsLinked)} onUpdateOffset={updateColorOffset} styles={styles} isDark={isDark} settings={settings} />}
+      {pickerOpenId && <ColorEditor 
+          color={activePalette.find(c => c.id === pickerOpenId)} 
+          onClose={() => setPickerOpenId(null)} 
+          onDelete={(id) => {
+              setActivePalette(prev => prev.filter(c => c.id !== id));
+              setSettings(s => ({ ...s, paletteSize: Math.max(2, s.paletteSize - 1) }));
+              setPickerOpenId(null);
+              setRecalcTrigger(n => n + 1);
+          }}
+          position={pickerPosition} 
+          onUpdateLogic={(id, hex) => updateColor(id, hex, 'logic')} 
+          onUpdatePaint={(id, hex) => updateColor(id, hex, 'paint')} 
+          onToggleLock={(id) => { const np = [...activePalette]; const idx = np.findIndex(c => c.id === id); np[idx].locked = !np[idx].locked; setActivePalette(np); setRecalcTrigger(n => n + 1); }} 
+          isLinked={isColorsLinked} 
+          onToggleLink={() => setIsColorsLinked(!isColorsLinked)} 
+          onUpdateOffset={updateColorOffset} 
+          styles={styles} 
+          isDark={isDark} 
+          settings={settings} 
+      />}
+      
       <PaletteLibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onApply={handleApplyPreset} styles={styles} isDark={isDark} />
       
       <canvas ref={hiddenCanvasRef} className="hidden" />
@@ -1600,7 +2129,7 @@ export default function App() {
                   lastSourceInfoRef.current = { w: e.target.videoWidth, h: e.target.videoHeight };
                   const initialWidth = Math.min(e.target.videoWidth, 360);
                   const initialHeight = Math.round(initialWidth / ar);
-                  setSettings(s => ({ ...s, aspectRatio: ar, width: initialWidth, height: initialHeight }));
+                  setSettings(s => ({ ...s, aspectRatio: ar, width: initialWidth, height: initialHeight, originalFps: null }));
                   setViewState(v => ({ ...v, isFit: true })); e.target.currentTime = 0;
               }}
               onSeeked={(e) => { if (isRenderingVideo) return; setVideoCurrentTime(e.target.currentTime); extractFrameFromSource(e.target); }}
