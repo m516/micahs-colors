@@ -7,6 +7,7 @@ import {
   Maximize2, Minimize, Focus, SunMoon, RotateCcw, X, Link as LinkIcon, Unlink, Settings, FileType,
   Eye, EyeOff, Layers, MousePointer2, Dices, Library, Film, Play, Pause, Video, Trash
 } from 'lucide-react';
+import mixbox from './lib/mixbox';
 
 // ==========================================
 // 1. MATH & COLOR UTILITIES
@@ -1189,18 +1190,6 @@ export default function App() {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)'); setIsDark(mediaQuery.matches);
     const handler = (e) => setIsDark(e.matches); mediaQuery.addEventListener('change', handler);
     return () => mediaQuery.removeEventListener('change', handler);
-  }, []);
-
-  useEffect(() => {
-      if (window.mixbox) { setMixboxLoaded(true); return; }
-      if (document.getElementById('mixbox-script')) return;
-      const script = document.createElement('script');
-      script.id = 'mixbox-script';
-      script.src = 'https://cdn.jsdelivr.net/gh/scrtwpns/mixbox@master/js/mixbox.js';
-      script.async = true;
-      script.onload = () => setMixboxLoaded(true);
-      script.onerror = () => console.warn("Failed to load Mixbox");
-      document.body.appendChild(script);
   }, []);
 
   const styles = useMemo(() => getThemeStyles(isDark), [isDark]);
