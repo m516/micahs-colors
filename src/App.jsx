@@ -137,18 +137,53 @@ const LOSPEC_PRESETS = [
 ];
 
 const fetchLospecPalette = async (rawSlug) => {
-    // Lospec slugs are kebab-case alphanumeric. Accept either a slug or a full URL.
-    const fromUrl = rawSlug.match(/lospec\.com\/palette-list\/([a-z0-9-]+)/i);
-    const slug = (fromUrl ? fromUrl[1] : rawSlug).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    // Parse the slug from any of:
+    //   - bare slug:        "resurrect-64"
+    //   - web URL:          "https://lospec.com/palette-list/resurrect-64"
+    //   - Lospec custom URI: "lospec-palette://resurrect-64"  (from Lospec's "Open in Software"
+    //                        feature -- the scheme is documented at lospec.com/palettes/api)
+    // The custom-URI case is the one that caused the "lospec-palettegreyt-bit" bug --
+    // without this match, the `:` and `//` got stripped and concatenated into the rest.
+    const fromUri = rawSlug.match(/(?:lospec\.com\/palette-list\/|lospec-palette:\/\/)([a-z0-9-]+)/i);
+    const slug = (fromUri ? fromUri[1] : rawSlug)
+        .trim().toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
     if (!slug) throw new Error('Empty or invalid slug.');
-    const url = `https://lospec.com/palette-list/${slug}.json`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Lospec returned ${res.status} for "${slug}"`);
-    const data = await res.json();
-    if (data?.error) throw new Error(data.error);
-    if (!Array.isArray(data?.colors)) throw new Error('Malformed response.');
-    // Lospec returns bare hex like "574368"; the rest of the app expects "#574368".
-    return { name: data.name || slug, author: data.author || '', colors: data.colors.map(c => '#' + c.replace(/^#/, '')) };
+
+    const directUrl = `https://lospec.com/palette-list/${slug}.json`;
+
+    const parse = async (res) => {
+        if (!res.ok) {
+            if (res.status === 404) throw new Error(`Palette "${slug}" not found on Lospec.`);
+            throw new Error(`Lospec returned HTTP ${res.status}.`);
+        }
+        const data = await res.json();
+        if (data?.error) throw new Error(data.error);
+        if (!Array.isArray(data?.colors)) throw new Error('Malformed Lospec response.');
+        // Lospec returns bare hex like "574368"; the rest of the app expects "#574368".
+        return { name: data.name || slug, author: data.author || '', colors: data.colors.map(c => '#' + c.replace(/^#/, '')) };
+    };
+
+    // Try a direct fetch first. As of writing, Lospec doesn't send CORS headers, so this
+    // throws TypeError("Failed to fetch") in every browser -- but it's a cheap one round trip,
+    // and if Lospec ever adds CORS it'll start working with no further code changes.
+    try {
+        return await parse(await fetch(directUrl));
+    } catch (_directErr) {
+        // Swallow and fall through to the proxy. (Browser CORS failures look opaque, so we
+        // can't tell a 404 from a CORS block at this stage -- the proxy lets us see both.)
+    }
+
+    // Fallback: api.allorigins.win/raw. Public, free, no API key, no localhost restriction.
+    // If allorigins ever goes down, the user can paste a Lospec .hex/.json file via the
+    // Import Palette button or drag-drop instead.
+    try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
+        return await parse(await fetch(proxyUrl));
+    } catch (proxyErr) {
+        throw new Error(`Could not load "${slug}". Lospec blocked the direct request (CORS), and the public proxy also failed (${proxyErr.message || 'network error'}). Check the slug, or try again later.`);
+    }
 };
 
 const PRESET_PALETTES = {
@@ -1496,7 +1531,6 @@ const DitheringPanel = ({ styles, isDark, settings, updateSetting, paletteData, 
                 }} />
                 {settings.ditherCategory === 'flow' && settings.ditherSubMethod !== 'riemersma' && <IconButton styles={styles} icon={WrapText} onClick={() => updateSetting('serpentine', !settings.serpentine)} title="Serpentine Scanning" className={`border ${settings.serpentine ? (isDark ? 'bg-neutral-800 border-neutral-400' : 'bg-neutral-200 border-neutral-400') : 'border-neutral-300 dark:border-neutral-700'}`} />}
                 {settings.ditherCategory === 'pattern' && settings.ditherSubMethod === 'halftone' && paletteData.displayed.some(c => c.locked) && <IconButton styles={styles} icon={Dices} onClick={() => onPaletteAction.randomizeOffsets()} title="Randomize All Offsets" className={`border border-neutral-300 dark:border-neutral-700`} />}
-                {settings.ditherCategory === 'geometric' && settings.ditherSubMethod === 'knoll' && <IconButton styles={styles} icon={Dices} onClick={() => updateSetting('ditherSeed', (settings.ditherSeed || 0) + 1)} title="Reseed Pattern" className="border border-neutral-300 dark:border-neutral-700" />}
             </div>
             {settings.ditherCategory === 'flow' && settings.ditherSubMethod === 'riemersma' && <>
                 <div><div className="flex justify-between text-xs font-bold text-neutral-400 mb-1.5"><span>CURVE HISTORY (Q)</span><span>{settings.riemersmaHistory}</span></div><RangeSlider styles={styles} min={4} max={64} step={4} value={settings.riemersmaHistory} onChange={(e) => updateSetting('riemersmaHistory', Number(e.target.value))} /></div>
