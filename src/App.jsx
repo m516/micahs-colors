@@ -429,12 +429,22 @@ const getBlueNoiseMap = (size) => {
     return BLUE_NOISE_MAPS[size];
 };
 
+// Pre-existing bug fix: emit at the CENTER of each leaf cell, not its corner.
+// With corner emission, multiple recursion branches collapse to the same integer
+// coordinate after Math.floor, while other in-bounds cells are never reached.
+// Empirically this left ~20% of pixels unvisited on a 64x64 grid, which then
+// retained their pre-dither source colours -- visible as "invalid" pixels in the
+// Riemersma output. Center emission is the textbook formulation and gives 100%
+// coverage on any power-of-two grid (and contiguous coverage on the in-bounds
+// subset of non-power-of-two grids).
 const generateHilbertCurve = (width, height) => {
     const size = Math.pow(2, Math.ceil(Math.log2(Math.max(width, height))));
     const points = [];
     const hilbert = (x, y, xi, xj, yi, yj, n) => {
         if (n <= 0) {
-            if (x >= 0 && x < width && y >= 0 && y < height) points.push({x: Math.floor(x), y: Math.floor(y)});
+            const px = Math.floor(x + (xi + yi) / 2);
+            const py = Math.floor(y + (xj + yj) / 2);
+            if (px >= 0 && px < width && py >= 0 && py < height) points.push({x: px, y: py});
         } else {
             hilbert(x,           y,           yi/2, yj/2, xi/2, xj/2, n-1);
             hilbert(x+xi/2,      y+xj/2,      xi/2, xj/2, yi/2, yj/2, n-1);
@@ -1347,7 +1357,7 @@ const ColorEditor = ({ color, onClose, onDelete, position, onUpdateLogic, onUpda
     );
 };
 
-const FloatingToolbar = ({ styles, isDark, zoom, setZoom, isComparing, onCompareStart, onCompareEnd, onCenter, onOneToOne, onFit, onDownload, isAnimation, isGif, gifTotalFrames, gifCurrentFrame, onSeekGif, onRenderGif, isVideo, videoDuration, videoCurrentTime, onSeekVideo, onRenderVideo, settings }) => {
+const FloatingToolbar = ({ styles, isDark, zoom, setZoom, isComparing, onCompareStart, onCompareEnd, onCenter, onOneToOne, onFit, isAnimation, isGif, gifTotalFrames, gifCurrentFrame, onSeekGif, isVideo, videoDuration, videoCurrentTime, onSeekVideo, settings }) => {
     const [tempInput, setTempInput] = useState('100');
     useEffect(() => { setTempInput(Math.round(zoom * 100).toString()); }, [zoom]);
 
@@ -1385,14 +1395,10 @@ const FloatingToolbar = ({ styles, isDark, zoom, setZoom, isComparing, onCompare
                  <IconButton onClick={onCenter} icon={Focus} title="Center Image" styles={styles} />
                  <IconButton onClick={onOneToOne} icon={Maximize2} title="1:1 (100%)" styles={styles} />
                  <IconButton onClick={onFit} icon={Minimize} title="Fit to Viewport" styles={styles} />
-                 <IconButton onClick={onDownload} icon={isAnimation ? ImageIcon : Download} title={isAnimation ? "Download Rendered Frame" : "Download Render"} styles={styles} />
             </div>
 
             {isAnimation && (
                 <div className={`flex items-center gap-3 w-full pt-1.5 border-t ${isDark ? 'border-neutral-800' : 'border-neutral-200'}`}>
-                    <button onClick={isGif ? onRenderGif : onRenderVideo} className={`px-3 py-1.5 transition-colors flex items-center justify-center gap-1.5 font-bold text-xs uppercase border ${isDark ? 'bg-transparent border-neutral-700 text-neutral-300 hover:bg-neutral-800 hover:text-white' : 'bg-transparent border-neutral-300 text-neutral-600 hover:bg-neutral-100 hover:text-black'}`}>
-                        <Film size={12} /> Render
-                    </button>
                     <span className="text-xs font-mono text-neutral-400 min-w-[3ch] text-right">{currentFrame}</span>
                     <RangeSlider min={0} max={totalFrames ? totalFrames - 1 : 1} step={1} value={currentFrame} onChange={(e) => isGif ? onSeekGif(Number(e.target.value)) : onSeekVideo(Number(e.target.value) / VIDEO_FPS)} styles={styles} className="flex-1" />
                     <span className="text-xs font-mono text-neutral-400 min-w-[3ch]">{totalFrames}</span>
@@ -1669,42 +1675,87 @@ export default function App() {
       }
   };
 
+  // Unified source-frame iterator. Returns whatever an animated input has -- decoded GIF
+  // frames OR seekable video frames -- behind a single interface, so that the GIF encoder
+  // and the video encoder can each accept either input. This is what lets the user choose
+  // the output format independently of the input format.
+  const buildSourceFrameIterator = async () => {
+      const VIDEO_FPS = settingsRef.current.videoFps || 30;
+      if (isGif && gifFramesRef.current.length > 0) {
+          const frames = gifFramesRef.current;
+          return {
+              count: frames.length,
+              getFrame: async (i) => frames[i].canvas,
+              getDisposal: (i) => frames[i].disposal || 1,
+              cleanup: () => {},
+          };
+      }
+      if (isVideo && videoRef.current) {
+          const video = videoRef.current;
+          const totalFrames = Math.floor((videoDuration || 0) * VIDEO_FPS);
+          const prevOnSeeked = video.onseeked;
+          video.onseeked = null;
+          return {
+              count: totalFrames,
+              getFrame: async (i) => {
+                  video.currentTime = i / VIDEO_FPS;
+                  await new Promise(r => {
+                      const handler = () => { video.removeEventListener('seeked', handler); r(); };
+                      video.addEventListener('seeked', handler);
+                  });
+                  return video;
+              },
+              getDisposal: () => 1,
+              cleanup: () => {
+                  video.onseeked = prevOnSeeked || ((e) => {
+                      if (isRenderingVideo) return;
+                      setVideoCurrentTime(e.target.currentTime);
+                      extractFrameFromSource(e.target);
+                  });
+                  video.currentTime = videoCurrentTime;
+              },
+          };
+      }
+      return null;
+  };
+
   const handleRenderGif = async () => {
-      if (gifFramesRef.current.length === 0) return;
+      const iter = await buildSourceFrameIterator();
+      if (!iter || iter.count === 0) return;
       setIsRenderingVideo(true); setRenderPhase('Encoding GIF'); setRenderProgress(0);
-      
+
       const w = settingsRef.current.width; const h = settingsRef.current.height;
-      const frames = gifFramesRef.current;
       const fps = settingsRef.current.videoFps || 30;
       const delay = Math.max(2, Math.round(100 / fps));
-      
+
       // Directly translate active specific Palette to GIF Palette
       const customPalette = activePaletteRef.current.map(c => (c.displayR << 16) | (c.displayG << 8) | c.displayB);
       const transparentIndex = customPalette.length;
-      
+
       // Pad palette to power of 2
       let targetLen = 2;
       while (targetLen < customPalette.length + 1 && targetLen <= 256) targetLen <<= 1;
       const paletteToUse = [...customPalette, 0x000000];
       while (paletteToUse.length < targetLen) paletteToUse.push(0);
-      
+
       const colorCache = new Map();
       customPalette.forEach((c, i) => colorCache.set(c, i));
 
       // Overestimate buffer to prevent capacity issues
-      const bufSize = Math.max(1024 * 1024 * 5, 1024 + (frames.length * w * h * 3));
+      const bufSize = Math.max(1024 * 1024 * 5, 1024 + (iter.count * w * h * 3));
       const buffer = new Uint8Array(bufSize);
       const writer = new GifWriter(buffer, w, h, { loop: 0 });
-      
-      for (let i = 0; i < frames.length; i++) {
-          extractFrameFromSource(frames[i].canvas);
+
+      for (let i = 0; i < iter.count; i++) {
+          const frame = await iter.getFrame(i);
+          extractFrameFromSource(frame);
           renderDitheredImage(canvasRef.current, sourceDataRef.current, activePaletteRef.current, settingsRef.current);
-          
+
           const ctx = canvasRef.current.getContext('2d');
           const rgba = ctx.getImageData(0, 0, w, h).data;
           const indexedPixels = new Uint8Array(w * h);
           let hasTransparency = false;
-          
+
           for (let p = 0; p < rgba.length; p += 4) {
               if (rgba[p+3] < 128) {
                   indexedPixels[p/4] = transparentIndex;
@@ -1726,54 +1777,52 @@ export default function App() {
                   indexedPixels[p/4] = idx;
               }
           }
-          
+
           const options = {
               palette: paletteToUse,
-              delay: Math.max(2, Math.round(100 / (settingsRef.current.videoFps || 30))),
-              disposal: frames[i].disposal || 1
+              delay,
+              disposal: iter.getDisposal(i),
           };
           if (hasTransparency) options.transparent = transparentIndex;
-          
+
           writer.addFrame(0, 0, w, h, indexedPixels, options);
-          setRenderProgress((i + 1) / frames.length);
+          setRenderProgress((i + 1) / iter.count);
           await new Promise(r => setTimeout(r, 0));
       }
-      
+
       const finalBuffer = buffer.slice(0, writer.end());
       const blob = new Blob([finalBuffer], { type: 'image/gif' });
       const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
       link.download = 'dithered-animation.gif'; link.click();
-      
+
+      iter.cleanup();
       setIsRenderingVideo(false); setRenderPhase('');
   };
 
   const handleRenderVideo = async () => {
-      if (!videoRef.current || !canvasRef.current) return;
+      const iter = await buildSourceFrameIterator();
+      if (!iter || iter.count === 0 || !canvasRef.current) return;
       setIsRenderingVideo(true); setRenderPhase('Extracting Frames'); setRenderProgress(0);
-      
-      const video = videoRef.current;
-      const VIDEO_FPS = settingsRef.current.videoFps || 30;
-      const totalFrames = Math.floor(videoDuration * VIDEO_FPS);
-      const renderedFrames = [];
-      video.onseeked = null;
 
-      for (let i = 0; i < totalFrames; i++) {
-          video.currentTime = i / VIDEO_FPS;
-          await new Promise(r => { const handler = () => { video.removeEventListener('seeked', handler); r(); }; video.addEventListener('seeked', handler); });
-          extractFrameFromSource(video);
+      const VIDEO_FPS = settingsRef.current.videoFps || 30;
+      const renderedFrames = [];
+
+      for (let i = 0; i < iter.count; i++) {
+          const frame = await iter.getFrame(i);
+          extractFrameFromSource(frame);
           renderDitheredImage(canvasRef.current, sourceDataRef.current, activePaletteRef.current, settingsRef.current);
           const bitmap = await createImageBitmap(canvasRef.current);
           renderedFrames.push(bitmap);
-          setRenderProgress((i + 1) / totalFrames);
-          await new Promise(r => setTimeout(r, 0)); 
+          setRenderProgress((i + 1) / iter.count);
+          await new Promise(r => setTimeout(r, 0));
       }
-      
+
       setRenderPhase('Encoding Video'); setRenderProgress(0);
       const stream = canvasRef.current.captureStream(VIDEO_FPS);
       const recorder = new MediaRecorder(stream);
       const chunks = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-      
+
       const recordingPromise = new Promise(resolve => {
           recorder.onstop = () => {
               const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
@@ -1783,27 +1832,25 @@ export default function App() {
               a.download = `dithered-video.${extension}`; a.click(); resolve();
           };
       });
-      
+
       const ctx = canvasRef.current.getContext('2d');
       ctx.drawImage(renderedFrames[0], 0, 0); recorder.start();
       const frameDurationMs = 1000 / VIDEO_FPS; let startTime = performance.now(); let frameIdx = 0;
-      
+
       const playNextFrame = (timestamp) => {
           const elapsed = timestamp - startTime;
           const targetFrame = Math.floor(elapsed / frameDurationMs);
-          if (targetFrame > frameIdx && targetFrame < totalFrames) {
-              frameIdx = targetFrame; ctx.drawImage(renderedFrames[frameIdx], 0, 0); setRenderProgress(frameIdx / totalFrames);
+          if (targetFrame > frameIdx && targetFrame < iter.count) {
+              frameIdx = targetFrame; ctx.drawImage(renderedFrames[frameIdx], 0, 0); setRenderProgress(frameIdx / iter.count);
           }
-          if (frameIdx < totalFrames - 1) requestAnimationFrame(playNextFrame);
+          if (frameIdx < iter.count - 1) requestAnimationFrame(playNextFrame);
           else setTimeout(() => recorder.stop(), frameDurationMs);
       };
-      
+
       requestAnimationFrame(playNextFrame); await recordingPromise;
       renderedFrames.forEach(bmp => bmp.close && bmp.close());
+      iter.cleanup();
       setIsRenderingVideo(false); setRenderPhase('');
-      
-      video.onseeked = (e) => { if (isRenderingVideo) return; setVideoCurrentTime(e.target.currentTime); extractFrameFromSource(e.target); };
-      video.currentTime = videoCurrentTime;
   };
 
   const resetView = useCallback(() => {
@@ -2204,11 +2251,44 @@ export default function App() {
 
       <div className={styles.panel}>
           <div className={styles.panelHeader}>
-              <div className="flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-neutral-500" />
-                  <h1 className={styles.heading}>Micah's Colors</h1>
+              <div className="flex items-center gap-2 min-w-0">
+                  <Layers className="w-5 h-5 text-neutral-500 flex-shrink-0" />
+                  <h1 className={`${styles.heading} truncate`}>Micah's Colors</h1>
               </div>
-              <IconButton styles={styles} icon={FolderOpen} onClick={() => document.getElementById('main-upload')?.click()} title="Open Media" />
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                  {imageSrc && (
+                      <IconButton
+                          styles={styles}
+                          icon={(isVideo || isGif) ? ImageIcon : Download}
+                          onClick={() => {
+                              if (!canvasRef.current) return;
+                              const link = document.createElement('a');
+                              link.download = (isVideo || isGif) ? 'pixel-frame.png' : 'pixel-art.png';
+                              link.href = canvasRef.current.toDataURL();
+                              link.click();
+                          }}
+                          title={(isVideo || isGif) ? "Save Current Frame as PNG" : "Save Image as PNG"}
+                      />
+                  )}
+                  {(isVideo || isGif) && (
+                      <>
+                          <IconButton
+                              styles={styles}
+                              icon={Film}
+                              onClick={handleRenderGif}
+                              title="Render as Animated GIF"
+                          />
+                          <IconButton
+                              styles={styles}
+                              icon={Video}
+                              onClick={handleRenderVideo}
+                              title="Render as Video (WebM/MP4)"
+                          />
+                      </>
+                  )}
+                  {imageSrc && <div className={`w-px h-4 mx-1 ${isDark ? 'bg-neutral-700' : 'bg-neutral-300'}`}></div>}
+                  <IconButton styles={styles} icon={FolderOpen} onClick={() => document.getElementById('main-upload')?.click()} title="Open Image / Video / GIF" />
+              </div>
               <input type="file" id="main-upload" className="hidden" accept="image/*,video/*,image/gif" onChange={(e) => processImageFile(e.target.files?.[0])} />
           </div>
 
@@ -2305,7 +2385,7 @@ export default function App() {
             </div>
         )}
         
-        {imageSrc && <FloatingToolbar styles={styles} isDark={isDark} zoom={viewState.scale} setZoom={z => setViewState(v => ({...v, scale: typeof z === 'function' ? z(v.scale) : z, isFit: false}))} isComparing={isComparing} onCompareStart={() => setIsComparing(true)} onCompareEnd={() => setIsComparing(false)} onCenter={() => setViewState(v => ({...v, x: 0, y: 0}))} onOneToOne={() => setViewState(v => ({...v, scale: 1, x: 0, y: 0, isFit: false}))} onFit={() => setViewState(v => ({...v, isFit: true}))} onDownload={() => { const link = document.createElement('a'); link.download = (isVideo || isGif) ? 'pixel-frame.png' : 'pixel-art.png'; link.href = canvasRef.current.toDataURL(); link.click(); }} isAnimation={isVideo || isGif} isGif={isGif} gifTotalFrames={gifTotalFrames} gifCurrentFrame={gifCurrentFrame} onSeekGif={handleGifSeek} onRenderGif={handleRenderGif} isVideo={isVideo} videoDuration={videoDuration} videoCurrentTime={videoCurrentTime} onSeekVideo={handleVideoSeek} onRenderVideo={handleRenderVideo} settings={settings} />}
+        {imageSrc && <FloatingToolbar styles={styles} isDark={isDark} zoom={viewState.scale} setZoom={z => setViewState(v => ({...v, scale: typeof z === 'function' ? z(v.scale) : z, isFit: false}))} isComparing={isComparing} onCompareStart={() => setIsComparing(true)} onCompareEnd={() => setIsComparing(false)} onCenter={() => setViewState(v => ({...v, x: 0, y: 0}))} onOneToOne={() => setViewState(v => ({...v, scale: 1, x: 0, y: 0, isFit: false}))} onFit={() => setViewState(v => ({...v, isFit: true}))} isAnimation={isVideo || isGif} isGif={isGif} gifTotalFrames={gifTotalFrames} gifCurrentFrame={gifCurrentFrame} onSeekGif={handleGifSeek} isVideo={isVideo} videoDuration={videoDuration} videoCurrentTime={videoCurrentTime} onSeekVideo={handleVideoSeek} settings={settings} />}
       </main>
       
       {pickerOpenId && <ColorEditor 
