@@ -1331,52 +1331,76 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
     const [lospecLoading, setLospecLoading] = useState('');
     const [lospecError, setLospecError] = useState('');
     const [shuffleSlugs, setShuffleSlugs] = useState(null); // null = no active shuffle
-    // Bumped after each background preview fetch so the modal re-renders with new cache data.
+    // Bumped after each background preview fetch / state transition so the modal
+    // re-renders with the new module-level cache contents.
     const [, setPreviewVersion] = useState(0);
-
     const safeCategory = categories.includes(activeCategory) ? activeCategory : categories[0];
 
-    // Compute filter results and preview-pane slugs every render. Pure functions of
-    // (lospecQuery, shuffleSlugs); cheap given list size.
-    const q = lospecQuery.trim().toLowerCase();
-    const filteredPresets = q ? LOSPEC_PRESETS.filter(s => s.toLowerCase().includes(q)) : LOSPEC_PRESETS;
-    // Preview rule: when filter narrows to ≤3 (and isn't empty), preview those.
-    // Else if user has shuffled, preview the shuffle picks. Else preview top-3 by popularity.
-    // This bounds the live request count to 3 per state transition.
-    let previewSlugs;
-    if (q && filteredPresets.length <= 3) previewSlugs = filteredPresets;
-    else if (shuffleSlugs) previewSlugs = shuffleSlugs;
-    else previewSlugs = LOSPEC_PRESETS.slice(0, 3);
+    // Regex filtering: every slug is plain alphanumeric+hyphens, so no slug contains
+    // regex special chars -- which means novice substring queries ("endesga") work
+    // unchanged, while power users get anchors and alternation ("64$", "^aap-",
+    // "(gb|gameboy)"). Invalid / mid-typed regex falls back to literal substring
+    // matching so the field stays responsive while typing brackets, etc.
+    const q = lospecQuery.trim();
+    const filteredPresets = (() => {
+        if (!q) return LOSPEC_PRESETS;
+        try {
+            const re = new RegExp(q, 'i');
+            return LOSPEC_PRESETS.filter(s => re.test(s));
+        } catch {
+            const lit = q.toLowerCase();
+            return LOSPEC_PRESETS.filter(s => s.toLowerCase().includes(lit));
+        }
+    })();
 
-    // Background-fetch any preview slugs not already cached or in flight.
-    // Module-level cache+inflight survives modal close/reopen and Strict-mode double-invoke.
+    // Visible list: shuffle takes precedence over filter; otherwise the (possibly-
+    // filtered) full popularity list. Top 3 of this list get auto-preloaded.
+    const visibleSlugs = shuffleSlugs || filteredPresets;
+    const toPreload = visibleSlugs.slice(0, 3);
+
+    // Fire-and-forget preview fetch. Module-level cache and in-flight set survive
+    // modal close/reopen and Strict-mode double-effect-invoke.
+    const triggerPreviewFetch = (slug) => {
+        if (lospecPreviewInFlight.has(slug)) return;
+        // If we have a stale error cached, clear it so the click feels like a retry.
+        if (lospecPreviewCache.get(slug)?.error) lospecPreviewCache.delete(slug);
+        lospecPreviewInFlight.add(slug);
+        setPreviewVersion(v => v + 1); // immediate "Loading…" feedback
+        (async () => {
+            try {
+                const data = await fetchLospecPalette(slug);
+                lospecPreviewCache.set(slug, data);
+            } catch (e) {
+                lospecPreviewCache.set(slug, { error: e.message || String(e) });
+            } finally {
+                lospecPreviewInFlight.delete(slug);
+                setPreviewVersion(v => v + 1);
+            }
+        })();
+    };
+
+    // Auto-preload the top 3 of the visible list on mount and whenever the visible
+    // slugs change (filter/shuffle/category switch).
     useEffect(() => {
         if (!isOpen || safeCategory !== 'Lospec') return;
-        previewSlugs.forEach(slug => {
-            if (lospecPreviewCache.has(slug) || lospecPreviewInFlight.has(slug)) return;
-            lospecPreviewInFlight.add(slug);
-            (async () => {
-                try {
-                    const data = await fetchLospecPalette(slug);
-                    lospecPreviewCache.set(slug, data);
-                } catch (e) {
-                    lospecPreviewCache.set(slug, { error: e.message || String(e) });
-                } finally {
-                    lospecPreviewInFlight.delete(slug);
-                    setPreviewVersion(v => v + 1);
-                }
-            })();
+        toPreload.forEach(slug => {
+            if (!lospecPreviewCache.has(slug) && !lospecPreviewInFlight.has(slug)) {
+                triggerPreviewFetch(slug);
+            }
         });
-    }, [isOpen, safeCategory, previewSlugs.join('|')]);
+    }, [isOpen, safeCategory, toPreload.join('|')]);
 
     if (!isOpen) return null;
 
-    const handleFetchLospec = async (slug) => {
+    // Direct-fetch path for the Load button (and Enter): fetches a typed slug/URL
+    // verbatim, applies on success, surfaces errors in the top banner. Distinct from
+    // preview fetches because this one DOES close the modal on success.
+    const handleLoadAndApply = async (slug) => {
         if (!slug) return;
         setLospecLoading(slug); setLospecError('');
         try {
             const data = await fetchLospecPalette(slug);
-            lospecPreviewCache.set(slug, data); // warm cache for future modal opens
+            lospecPreviewCache.set(slug, data); // warm cache for future opens
             onApply(data.colors);
         } catch (e) {
             setLospecError(e.message || String(e));
@@ -1385,15 +1409,11 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
         }
     };
 
-    // Re-roll the preview pane: pick 3 random slugs (without replacement). Clears any
-    // active filter so previewSlugs derivation lands on the shuffle branch.
+    // Re-roll: 3 random slugs without replacement.
     const handleShuffle = () => {
         const picks = [];
         const pool = [...LOSPEC_PRESETS];
-        for (let i = 0; i < 3 && pool.length > 0; i++) {
-            const idx = Math.floor(Math.random() * pool.length);
-            picks.push(pool.splice(idx, 1)[0]);
-        }
+        for (let i = 0; i < 3 && pool.length > 0; i++) picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
         setShuffleSlugs(picks);
         setLospecQuery('');
         setLospecError('');
@@ -1401,28 +1421,47 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
 
     const handleQueryChange = (e) => {
         setLospecQuery(e.target.value);
-        setShuffleSlugs(null); // typing always exits shuffle mode
+        setShuffleSlugs(null); // typing exits shuffle mode
         setLospecError('');
     };
 
-    // Renders a clickable preview card. Three visual states: loading (cache miss),
-    // error (cached as {error}), loaded (cached as {name, author, colors}).
-    const PreviewCard = ({ slug }) => {
+    // One unified click handler for every row in the visible list:
+    //   - Cached with colors  -> apply + close (the "commit" click)
+    //   - In flight           -> no-op (already loading)
+    //   - Anything else       -> trigger fetch, leave modal open (the "preview" click)
+    // This is the user's "click to preview, click again to commit" pattern.
+    const handleSlugClick = (slug) => {
+        const cached = lospecPreviewCache.get(slug);
+        if (cached?.colors) {
+            onApply(cached.colors);
+            return;
+        }
+        if (lospecPreviewInFlight.has(slug)) return;
+        triggerPreviewFetch(slug);
+    };
+
+    // Renders one entry of the unified list. Visual state depends on cache:
+    // loaded -> full preview card (swatches + author + count); error -> dimmed
+    // row with retry affordance; in flight -> skeleton row; uncached -> compact
+    // clickable row hinting "click to preview".
+    const SlugEntry = ({ slug }) => {
         const cached = lospecPreviewCache.get(slug);
         const colors = cached?.colors;
         const error = cached?.error;
-        const clickable = !!colors;
+        const inFlight = lospecPreviewInFlight.has(slug);
         return (
             <div
-                onClick={() => clickable && onApply(colors)}
-                className={`border p-3 transition-all ${clickable ? 'cursor-pointer' : 'cursor-default'} ${error ? 'opacity-60' : ''} ${isDark ? `border-neutral-800 ${clickable ? 'hover:bg-neutral-800' : ''}` : `border-neutral-200 ${clickable ? 'hover:bg-neutral-50' : ''}`}`}
+                onClick={() => handleSlugClick(slug)}
+                title={colors ? 'Click to apply' : error ? `Error: ${error} — click to retry` : inFlight ? 'Loading…' : 'Click to load preview'}
+                className={`border transition-all cursor-pointer ${error ? 'opacity-70' : ''} ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'} ${colors ? 'p-3' : 'px-3 py-2'}`}
             >
-                <div className="flex justify-between items-baseline text-xs mb-1.5 gap-2">
-                    <span className={`font-mono font-bold truncate ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>{slug}</span>
+                <div className={`flex justify-between items-baseline gap-2 text-xs ${colors ? 'mb-1.5 font-bold' : ''}`}>
+                    <span className={`font-mono truncate ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>{slug}</span>
                     <span className={`font-normal flex-shrink-0 ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                        {!cached ? 'Loading…' :
-                         error ? 'Unavailable' :
-                         `${cached.author ? cached.author + ' · ' : ''}${colors.length} colors`}
+                        {colors ? `${cached.author ? cached.author + ' · ' : ''}${colors.length} colors`
+                            : error ? 'Unavailable · click to retry'
+                            : inFlight ? 'Loading…'
+                            : ''}
                     </span>
                 </div>
                 {colors && (
@@ -1432,18 +1471,10 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                         {colors.map((c, i) => <div key={i} style={{backgroundColor: c, width: '100%', height: '100%'}} />)}
                     </div>
                 )}
-                {error && <div className={`text-xs italic ${isDark ? 'text-red-400' : 'text-red-600'}`}>{error}</div>}
-                {!cached && <div className={`h-8 animate-pulse ${isDark ? 'bg-neutral-800/50' : 'bg-neutral-200/50'}`} />}
+                {inFlight && !colors && <div className={`h-6 animate-pulse mt-1 ${isDark ? 'bg-neutral-800/50' : 'bg-neutral-200/50'}`} />}
             </div>
         );
     };
-
-    const previewHeading =
-        q && filteredPresets.length <= 3
-            ? `Preview · ${filteredPresets.length} match${filteredPresets.length === 1 ? '' : 'es'} for "${q}"`
-            : shuffleSlugs
-                ? 'Preview · 3 random palettes'
-                : 'Preview · top by popularity';
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
@@ -1456,7 +1487,7 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                     <Select styles={styles} value={safeCategory} onChange={e => { setActiveCategory(e.target.value); setLospecError(''); }} options={categories.map(c => ({value: c, label: c}))} />
                     {safeCategory === 'Lospec' ? (
                         <p className={`text-xs mt-2 italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                            Source: <a href="https://lospec.com/palette-list" target="_blank" rel="noreferrer" className="underline hover:text-neutral-300">lospec.com/palette-list</a>. Previews fetch only the 3 visible cards; narrow the filter or hit Shuffle to swap them.
+                            Source: <a href="https://lospec.com/palette-list" target="_blank" rel="noreferrer" className="underline hover:text-neutral-300">lospec.com/palette-list</a>. Click a slug to load its preview; click the preview to apply. Top 3 of the visible list auto-preview.
                         </p>
                     ) : PRESET_PALETTES[safeCategory]?._source && (
                         <p className={`text-xs mt-2 italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
@@ -1472,20 +1503,21 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                                 type="text"
                                 value={lospecQuery}
                                 onChange={handleQueryChange}
-                                onKeyDown={e => e.key === 'Enter' && handleFetchLospec(lospecQuery)}
-                                placeholder="Filter or enter slug / URL"
-                                className={`flex-1 px-2 py-1 text-xs border bg-transparent focus:outline-none ${isDark ? 'border-neutral-700 text-neutral-200' : 'border-neutral-300 text-neutral-800'}`}
+                                onKeyDown={e => e.key === 'Enter' && handleLoadAndApply(lospecQuery)}
+                                placeholder="Filter (regex) · slug · URL"
+                                className={`flex-1 px-2 py-1 text-xs border bg-transparent focus:outline-none font-mono ${isDark ? 'border-neutral-700 text-neutral-200' : 'border-neutral-300 text-neutral-800'}`}
                             />
                             <button
                                 onClick={handleShuffle}
-                                title="Shuffle: roll 3 random palettes to preview"
+                                title="Lucky shuffle: 3 random palettes"
                                 className={`px-2 py-1 text-xs border transition-colors flex items-center ${isDark ? 'border-neutral-700 hover:bg-neutral-800 text-neutral-300' : 'border-neutral-300 hover:bg-neutral-100 text-neutral-700'}`}
                             >
                                 <Dices size={12} />
                             </button>
                             <button
-                                onClick={() => handleFetchLospec(lospecQuery)}
+                                onClick={() => handleLoadAndApply(lospecQuery)}
                                 disabled={!lospecQuery.trim() || lospecLoading === lospecQuery.trim()}
+                                title="Fetch and apply this slug/URL directly"
                                 className={`px-3 py-1 text-xs font-bold uppercase border transition-colors ${isDark ? 'border-neutral-700 hover:bg-neutral-800 disabled:opacity-30' : 'border-neutral-300 hover:bg-neutral-100 disabled:opacity-30'}`}
                             >
                                 {lospecLoading === lospecQuery.trim() ? 'Loading…' : 'Load'}
@@ -1498,37 +1530,21 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                             </div>
                         )}
 
-                        {previewSlugs.length > 0 && (
-                            <div className="mt-3 space-y-2">
-                                <div className={`text-xs uppercase tracking-wider font-bold ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                                    {previewHeading}
-                                </div>
-                                {previewSlugs.map(slug => <PreviewCard key={slug} slug={slug} />)}
-                            </div>
-                        )}
-
-                        <div className={`mt-4 text-xs uppercase tracking-wider font-bold ${isDark ? 'text-neutral-500' : 'text-neutral-400'} mb-2`}>
-                            {q
-                                ? `${filteredPresets.length} of ${LOSPEC_PRESETS.length} match "${q}"`
-                                : `Full list · ${LOSPEC_PRESETS.length} palettes by popularity`}
-                            <span className="font-normal normal-case ml-1">· click to apply directly</span>
+                        <div className={`mt-3 mb-2 text-xs uppercase tracking-wider font-bold ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                            {shuffleSlugs
+                                ? '3 random palettes'
+                                : q
+                                    ? `${filteredPresets.length} of ${LOSPEC_PRESETS.length} match /${q}/i`
+                                    : `${LOSPEC_PRESETS.length} palettes by popularity`}
                         </div>
-                        {filteredPresets.length === 0 ? (
+
+                        {visibleSlugs.length === 0 ? (
                             <div className={`text-xs italic p-3 border ${isDark ? 'border-neutral-800 text-neutral-500' : 'border-neutral-200 text-neutral-400'}`}>
                                 No preset matches. Press Load to fetch "{q}" from Lospec anyway.
                             </div>
                         ) : (
                             <div className="space-y-1">
-                                {filteredPresets.map(slug => (
-                                    <div
-                                        key={slug}
-                                        onClick={() => handleFetchLospec(slug)}
-                                        className={`border px-3 py-2 cursor-pointer transition-all flex justify-between items-center ${lospecLoading === slug ? 'opacity-50' : ''} ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'}`}
-                                    >
-                                        <span className={`text-xs font-mono ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>{slug}</span>
-                                        {lospecLoading === slug && <span className="text-xs text-neutral-500">Fetching…</span>}
-                                    </div>
-                                ))}
+                                {visibleSlugs.map(slug => <SlugEntry key={slug} slug={slug} />)}
                             </div>
                         )}
                     </div>
@@ -2253,7 +2269,14 @@ export default function App() {
       }
   }, [settings.width, settings.height]);
 
-  useEffect(() => { if (viewState.isFit) resetView(); }, [settings.width, settings.height, viewState.isFit, resetView]);
+  useEffect(() => {
+      if (!viewState.isFit) return;
+      // Defer past the first paint so the initial clientWidth/Height read doesn't
+      // force layout before Tailwind has finished applying styles -- avoids the
+      // "Layout was forced before the page was fully loaded" FOUC warning.
+      const id = requestAnimationFrame(() => resetView());
+      return () => cancelAnimationFrame(id);
+  }, [settings.width, settings.height, viewState.isFit, resetView]);
 
   const updateColor = (id, hex, mode) => {
       const [r, g, b] = hexToRgb(hex); const newPalette = [...activePaletteRef.current];
