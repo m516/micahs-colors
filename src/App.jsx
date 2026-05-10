@@ -22,6 +22,35 @@ const hexToRgb = (hex) => {
   return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
 };
 
+// Zoom snap points: integer multipliers above 1, unit fractions 1/N below 1. Pixel-art zooms
+// look cleanest (no moire from sub-pixel scaling) at these magnifications.
+const ZOOM_SNAPS = (() => {
+    const snaps = [];
+    for (let n = 64; n >= 2; n--) snaps.push(1 / n);  // 1/64 .. 1/2
+    for (let n = 1; n <= 64; n++) snaps.push(n);      // 1, 2, .. 64
+    return snaps;
+})();
+
+// Soft-snap: if `z` is within `tolerance` (relative) of a snap point, return that point;
+// otherwise return `z` unchanged. The forgiveness lets gradual scroll-wheel zoom "stick"
+// near clean values without trapping the user — fast scrolls pass straight through.
+const softSnapZoom = (z, tolerance = 0.04) => {
+    let best = z, bestDist = Infinity;
+    for (const s of ZOOM_SNAPS) {
+        const d = Math.abs(z - s) / s;
+        if (d < tolerance && d < bestDist) { bestDist = d; best = s; }
+    }
+    return best;
+};
+
+// Step to the next snap point in a direction. Used by the +/- zoom buttons.
+const nextZoomSnap = (current, direction) => {
+    const eps = 1e-4;
+    if (direction > 0) return ZOOM_SNAPS.find(s => s > current + eps) ?? ZOOM_SNAPS[ZOOM_SNAPS.length - 1];
+    for (let i = ZOOM_SNAPS.length - 1; i >= 0; i--) if (ZOOM_SNAPS[i] < current - eps) return ZOOM_SNAPS[i];
+    return ZOOM_SNAPS[0];
+};
+
 // ==========================================
 // 2. CONFIG & CONSTANTS
 // ==========================================
@@ -1285,12 +1314,42 @@ const PanelSection = ({ title, action, children, styles }) => (
     </section>
 );
 
-const NumberInput = ({ value, onChange, label, styles, className = "" }) => (
-    <div className={`relative flex items-center ${className}`}>
-        {label && <span className="absolute left-2 text-xs font-bold text-neutral-400 pointer-events-none">{label}</span>}
-        <input type="number" value={value} onChange={onChange} className={`${styles.input} w-full font-mono ${label ? 'pl-6' : ''}`} />
-    </div>
-);
+// NumberInput buffers the value while the user is typing so that a clamp/format
+// in the parent's onChange doesn't fight live keystrokes. Without this, typing
+// "15" into a field constrained to ≥2 fails: the "1" gets clamped to "2" before
+// the user can type the "5". Now the parent only sees the value on commit
+// (blur or Enter); mid-typing, the local buffer is shown verbatim. Escape
+// reverts to the parent's last value without committing.
+const NumberInput = ({ value, onChange, label, styles, className = "" }) => {
+    const [buf, setBuf] = useState(String(value));
+    const editingRef = useRef(false);
+    // Sync external value into buffer only while NOT actively editing.
+    useEffect(() => { if (!editingRef.current) setBuf(String(value)); }, [value]);
+    const commit = () => {
+        editingRef.current = false;
+        // Synthesize a minimal change event so existing callers (which read
+        // e.target.value) keep working unchanged.
+        onChange?.({ target: { value: buf } });
+    };
+    const revert = () => { editingRef.current = false; setBuf(String(value)); };
+    return (
+        <div className={`relative flex items-center ${className}`}>
+            {label && <span className="absolute left-2 text-xs font-bold text-neutral-400 pointer-events-none">{label}</span>}
+            <input
+                type="number"
+                value={buf}
+                onFocus={() => { editingRef.current = true; }}
+                onChange={e => setBuf(e.target.value)}
+                onBlur={commit}
+                onKeyDown={e => {
+                    if (e.key === 'Enter') { e.currentTarget.blur(); }
+                    else if (e.key === 'Escape') { revert(); e.currentTarget.blur(); }
+                }}
+                className={`${styles.input} w-full font-mono ${label ? 'pl-6' : ''}`}
+            />
+        </div>
+    );
+};
 
 const Select = ({ value, onChange, options, optgroups, styles, className = "" }) => (
     <select value={value} onChange={onChange} className={`${styles.select} ${className}`}>
@@ -1771,20 +1830,6 @@ const FloatingToolbar = ({ styles, isDark, zoom, setZoom, isComparing, onCompare
 
     const handleBlur = () => { const val = parseFloat(tempInput); if (!isNaN(val) && val > 0) setZoom(val / 100); else setTempInput(Math.round(zoom * 100).toString()); };
 
-    const getNextSnap = (current, direction) => {
-        const isZoomIn = direction > 0; const epsilon = 0.001; let newScale;
-        if (isZoomIn) { 
-            if (current >= 1) newScale = Math.floor(current + epsilon) + 1; 
-            else newScale = Math.pow(2, Math.floor(Math.log2(current) + epsilon) + 1); 
-        } else {
-            if (current > 1) {
-                newScale = Math.ceil(current - epsilon) - 1;
-                if (newScale < 1) newScale = 0.5;
-            } else newScale = Math.pow(2, Math.ceil(Math.log2(current) - epsilon) - 1);
-        }
-        return Math.min(Math.max(newScale, 0.015625), 64);
-    };
-
     const VIDEO_FPS = settings?.videoFps || 30;
     const totalFrames = isGif ? gifTotalFrames : Math.floor((videoDuration || 0) * VIDEO_FPS);
     const currentFrame = isGif ? gifCurrentFrame : Math.floor((videoCurrentTime || 0) * VIDEO_FPS);
@@ -1792,12 +1837,12 @@ const FloatingToolbar = ({ styles, isDark, zoom, setZoom, isComparing, onCompare
     return (
         <div className={`${styles.toolbar} flex flex-col gap-1.5 ${isAnimation ? 'w-[96%] max-w-2xl p-2' : 'px-3 py-1.5'}`}>
             <div className={`flex items-center justify-center gap-1 w-full`}>
-                 <IconButton onClick={() => setZoom(getNextSnap(zoom, -1))} icon={ZoomOut} styles={styles} />
+                 <IconButton onClick={() => setZoom(nextZoomSnap(zoom, -1))} icon={ZoomOut} styles={styles} />
                  <div className="relative flex items-center justify-center">
                    <input type="text" value={tempInput} onChange={(e) => setTempInput(e.target.value)} onBlur={handleBlur} onKeyDown={(e) => e.key === 'Enter' && handleBlur()} className="w-10 bg-transparent text-center text-xs font-bold focus:outline-none focus:ring-1 focus:ring-neutral-500 px-0.5" />
                    <span className="text-xs font-bold opacity-50">%</span>
                  </div>
-                 <IconButton onClick={() => setZoom(getNextSnap(zoom, 1))} icon={ZoomIn} styles={styles} />
+                 <IconButton onClick={() => setZoom(nextZoomSnap(zoom, 1))} icon={ZoomIn} styles={styles} />
                  <div className={`w-px h-3 mx-1 ${isDark ? 'bg-neutral-700' : 'bg-neutral-300'}`}></div>
                  <button onPointerDown={onCompareStart} onPointerUp={onCompareEnd} onMouseLeave={onCompareEnd} className={`${styles.buttonGhost} ${isComparing ? (isDark ? 'text-white bg-neutral-800' : 'text-neutral-900 bg-neutral-100') : ''}`} title="Hold to Compare"><Eye size={14} /></button>
                  <IconButton onClick={onCenter} icon={Focus} title="Center Image" styles={styles} />
@@ -1889,7 +1934,11 @@ export default function App() {
 
   const extractFrameFromSource = useCallback((sourceEl) => {
       if (!hiddenCanvasRef.current) return;
-      const ctx = hiddenCanvasRef.current.getContext('2d');
+      // willReadFrequently opts into a CPU-backed pixel buffer. This canvas is the
+      // scrubbing hot path: drawImage(video) + getImageData(full frame) fires for every
+      // frame during video timeline scrubbing. Without the flag, Chrome warns and
+      // each readback round-trips through the GPU.
+      const ctx = hiddenCanvasRef.current.getContext('2d', { willReadFrequently: true });
       hiddenCanvasRef.current.width = settingsRef.current.width; 
       hiddenCanvasRef.current.height = settingsRef.current.height;
       
@@ -2055,6 +2104,9 @@ export default function App() {
 
   useEffect(() => {
     if (!sourceDataRef.current || !canvasRef.current || activePalette.length === 0 || isRenderingVideo) return;
+    // 80ms debounce: longer than the 50ms auto-extract timer above, so cascaded
+    // state updates (e.g. unlock → auto-extract → palette change) collapse into a
+    // single render instead of rendering once before extract and again after.
     const timer = setTimeout(() => {
         renderDitheredImage(canvasRef.current, sourceDataRef.current, activePalette, settings);
         
@@ -2070,7 +2122,7 @@ export default function App() {
                 });
             }
         });
-    }, 10);
+    }, 80);
     return () => clearTimeout(timer);
   }, [activePalette, sourceVersion, settings, isRenderingVideo]);
 
@@ -2271,11 +2323,19 @@ export default function App() {
 
   useEffect(() => {
       if (!viewState.isFit) return;
-      // Defer past the first paint so the initial clientWidth/Height read doesn't
-      // force layout before Tailwind has finished applying styles -- avoids the
-      // "Layout was forced before the page was fully loaded" FOUC warning.
-      const id = requestAnimationFrame(() => resetView());
-      return () => cancelAnimationFrame(id);
+      // Defer the layout-forcing clientWidth/Height read until both: (a) the document
+      // is fully loaded so stylesheets are settled, and (b) the next paint frame, so
+      // we never force layout against unstyled DOM. requestAnimationFrame alone isn't
+      // enough -- on slow CSS loads, the next frame can still happen pre-stylesheet.
+      let rafId = 0;
+      const run = () => { rafId = requestAnimationFrame(() => resetView()); };
+      if (document.readyState === 'complete') {
+          run();
+      } else {
+          window.addEventListener('load', run, { once: true });
+          return () => { window.removeEventListener('load', run); if (rafId) cancelAnimationFrame(rafId); };
+      }
+      return () => { if (rafId) cancelAnimationFrame(rafId); };
   }, [settings.width, settings.height, viewState.isFit, resetView]);
 
   const updateColor = (id, hex, mode) => {
@@ -2781,7 +2841,15 @@ export default function App() {
                 style={{ touchAction: 'none' }}
                 onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={() => setIsPanning(false)} onMouseLeave={() => setIsPanning(false)}
                 onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-                onWheel={e => { const delta = -e.deltaY * 0.001; setViewState(v => ({...v, scale: clamp(v.scale + delta, 0.015625, 64), isFit: false})); }}
+                onWheel={e => {
+                    const delta = -e.deltaY * 0.001;
+                    setViewState(v => {
+                        const raw = clamp(v.scale + delta, 0.015625, 64);
+                        // Soft-snap to nearest 1/N or N. Lets the user pass through smoothly
+                        // while gently aligning to clean pixel-art zoom levels.
+                        return { ...v, scale: softSnapZoom(raw), isFit: false };
+                    });
+                }}
             >
                 <div className="w-full h-full flex items-center justify-center pointer-events-none relative">
                     

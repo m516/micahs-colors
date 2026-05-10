@@ -16,10 +16,27 @@
   html {
     font-family: var(--font-sans);
     line-height: 0.0;
+    /* Paint the dark theme as soon as this stylesheet parses, so the gap
+       between HTML parse and first React render isn't a white slab. The
+       background also has to live on html (not just body) because some
+       browsers paint html's bg during initial layout. */
+    background: #0a0a0a;
+    color: #e5e5e5;
+    color-scheme: dark;
   }
-
+ 
   body {
     line-height: 0.0;
+    background: #0a0a0a;
+    color: #e5e5e5;
+    margin: 0;
+  }
+ 
+  /* #root inherits #0a0a0a so any moment of partially-mounted React shows
+     the dark theme rather than the document body's transparent fallback. */
+  #root {
+    background: #0a0a0a;
+    min-height: 100vh;
   }
 }
 
