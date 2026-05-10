@@ -5,7 +5,7 @@ import {
   MoveVertical, MoveHorizontal, Sliders, Lock, Unlock, Contrast, Anchor, 
   FolderOpen, Save, FileJson, WrapText, ZoomIn, ZoomOut, 
   Maximize2, Minimize, Focus, SunMoon, RotateCcw, X, Link as LinkIcon, Unlink, Settings, FileType,
-  Eye, EyeOff, Layers, MousePointer2, Dices, Library, Film, Play, Pause, Video, Trash
+  Eye, EyeOff, Layers, MousePointer2, Dices, Library, Film, Play, Pause, Video, Trash, ImagePlay
 } from 'lucide-react';
 import mixbox from './lib/mixbox';
 
@@ -112,28 +112,68 @@ const ColorSpaceConverter = {
 
 const SPACE_SCALES = { srgb: 255, linear: 1, oklab: 1, lab: 100, yuv: 255 };
 
-// Curated list of popular Lospec palettes (lospec.com/palette-list/{slug}.json).
-// Slugs verified against the public listings; users can also enter their own slug
-// in the modal. Add to or reorder this list freely.
+// Popularity-ordered list of Lospec palette slugs. Source: lospec.com/palette-list
+// sorted by popularity. Stored as bare strings rather than {slug,name,author} objects
+// because the modal already shows the slug (which is the primary identifier) and
+// fetching the JSON gives us the real name + author on click. Some entries may be
+// retired or misspelled -- the fetch handles 404s gracefully with an inline error.
 const LOSPEC_PRESETS = [
-    { slug: 'resurrect-64',      name: 'Resurrect 64',     author: 'Kerrie Lake' },
-    { slug: 'apollo',            name: 'Apollo',           author: 'AdamCYounis' },
-    { slug: 'sweetie-16',        name: 'Sweetie 16',       author: 'GrafxKid' },
-    { slug: 'endesga-32',        name: 'Endesga 32',       author: 'Endesga' },
-    { slug: 'endesga-64',        name: 'Endesga 64',       author: 'Endesga' },
-    { slug: 'vinik24',           name: 'Vinik 24',         author: 'Vinik' },
-    { slug: 'na16',              name: 'NA16',             author: 'Nauris Amatnieks' },
-    { slug: 'pico-8',            name: 'PICO-8',           author: 'Lexaloffle' },
-    { slug: 'nyx8',              name: 'NYX8',             author: 'Javier Guerrero' },
-    { slug: 'journey',           name: 'Journey',          author: 'PineappleOnPizza' },
-    { slug: 'oil-6',             name: 'Oil 6',            author: 'GrafxKid' },
-    { slug: 'lospec500',         name: 'Lospec 500',       author: 'Lospec' },
-    { slug: '1bit-monitor-glow', name: '1-bit Monitor Glow', author: 'Polyducks' },
-    { slug: 'pear36',            name: 'PEAR36',           author: 'PineappleOnPizza' },
-    { slug: 'slso8',             name: 'SLSO8',            author: 'Luis Miguel Maldonado' },
-    { slug: 'kirokaze-gameboy',  name: 'Kirokaze GB',      author: 'Kirokaze' },
-    { slug: 'twilight-5',        name: 'Twilight 5',       author: 'GrafxKid' },
-    { slug: 'aap-64',            name: 'AAP-64',           author: 'Adigun A. Polack' },
+    'resurrect-64', 'endesga-32', 'apollo', 'lospec500', 'endesga-64', 'cc-29', 'slso8',
+    'pear36', 'aap-64', 'oil-6', 'na16', 'island-joy-16', 'kirokazegb', 'sweetie-16',
+    'journey', 'pollen8', 'dawnbringer-32', 'fantasy-24', 'nanner-32', 'fading-16',
+    'rustic-gb', 'mulfok32', 'arq4x', 'funkyfuture-8', 'mist-gb', 'vine-gb', 'pico-8',
+    'dawnbringer-16', 'vinik24', 'bubblegum-16', 'hept32', 'jellybeans', 'famicube',
+    'endesga-36', 'borkfest', 'nanner-jam-2', 'twilioquest-76', 'ammo-8', 'paper-8',
+    'steam-lords', 'azurestar33', '2bit-demichrome', 'aap-splendor128', 'hollow',
+    'furryrama', 'vines-flexible-linear-ramps', 'cga-palette-1', 'cga-palette-2',
+    'endesga-soft32', 'cmykgb', 'matt36', 'pixel-ink', '1bit-monitor-glow',
+    'japanese-woodblock-12', 'twilight-5', 'courtyard-21', 'moondrom',
+    '2bit-demichrome-plus', 'lava-gb', 'night-16', 'ice-cream-gb', 'retro-bubble',
+    'purplemorning8', 'starlight-64', 'lux2k', 'nostalgia', 'lux3k', 'frost-16',
+    'softmilk-32', 'vanilla-milkshake', 'fleja-master-palette', 'wish-64', 'splendor128',
+    'dreamscape8', 'fresh24', 'beach-day', 'pastel-64', 'sls08', 'microsoft-windows-20',
+    'pokewilds-battle', 'pokewilds-overworld', 'copper-tech', 'sunlit-days',
+    'midnight-ablaze', 'galaxy-flame', 'wish64', 'hocus-pocus', 'lost-century', 'cafe24',
+    'woodland16', 'rainbow32', 'solarized-dark-16', 'solarized-light-16', 'desert-32',
+    'furyfest', 'velvet-cherry', 'wintermute', 'c64', 'comfy-16', 'retrowave-gb',
+    'sakura-gb', 'radical-snail', 'magma-8', 'sunset-red', 'nord', 'cinnamon-8',
+    'dango-16', 'minty-16', 'kiwi-8', 'pastel-gb', 'forest-8', 'melon-16', 'berry-8',
+    'cotton-candy-16', 'cyberpunk-16', 'warm-autumn-16', 'coldfire-16', 'nightshade-16',
+    'vaporwave-16', 'oceanic-16', 'neon-16', 'retrocal-8', 'sunbeam-16', 'monochrome-8',
+    'pixel-paradise-16', 'ancient-16', 'mystic-16', 'ember-16', 'foggy-8', 'grim-night-16',
+    'lush-16', 'heavenly-16', 'muddy-16', 'dreamy-16', 'floral-16', 'candyshop-16',
+    'forest-moss-8', 'sunrise-16', 'toxic-16', 'midori-16', 'frozen-16', 'sandy-16',
+    'pixelgarden-16', 'halloween-16', 'grape-8', 'spacehaze', 'sweet-canyon-extended-64',
+    'sweet-canyon-16', 'everforest-16', 'autumn-kiss-16', 'mushroom-16', 'nature-16',
+    'crimson-16', 'blueberry-16', 'pastel-sunset-16', 'voltage-16', 'paperback-2',
+    'twilight-bit-7', 'neapolitan-16', 'synthwave-16', 'forestberry-16', 'heavenscape-16',
+    'sunburn-16', 'wildflower-16', 'cozy-16', 'misty-16', 'toxic-garden-16', 'soda-pop-16',
+    'cherry-milk-16', 'frostbite-16', 'lavender-fields-16', 'spring-bloom-16',
+    'moonlight-16', 'dusk-16', 'peachy-16', 'pixel-dreams-16', 'retro-summer-16',
+    'midnight-city-16', 'forest-fire-16', 'berry-smoothie-16', 'sage57', 'jehkoba32',
+    'grim32', 'mellow-16', 'taffy-16', 'summers-past-16', 'z64', 'rewild-64', 'arch',
+    'ludpiratepalette128', 'blk-aqu4', 'general', 'pokemon-gb', 'pokemon-rby',
+    'pokemon-gsc', 'pokemon-rse', 'pokemon-dpp', 'pokemon-hgss', 'pokemon-bw',
+    'pokemon-b2w2', 'pokemon-xy', 'pokemon-sm', 'pokemon-swsh', 'pokemon-sv', 'kirby-gb',
+    'zelda-gb', 'metroid-gb', 'mario-gb', 'earthbound-16', 'chrono-trigger-16', 'ff6-16',
+    'secret-of-mana-16', 'mana-seed-16', 'octopath-16', 'undertale-16', 'deltarune-16',
+    'celeste-16', 'hyper-light-16', 'dead-cells-16', 'hades-16', 'gris-16', 'ori-16',
+    'hollow-knight-16', 'shovel-knight-16', 'sonic-16', 'mega-man-16', 'castlevania-16',
+    'contra-16', 'doom-16', 'quake-16', 'diablo-16', 'warcraft-16', 'starcraft-16',
+    'age-of-empires-16', 'simcity-16', 'rollercoaster-16', 'minecraft-16', 'terraria-16',
+    'stardew-16', 'animal-crossing-16', 'splatoon-16', 'portal-16', 'half-life-16',
+    'bioshock-16', 'fallout-16', 'skyrim-16', 'oblivion-16', 'morrowind-16',
+    'cyberdream-16', 'retrofuture-16', 'analog-dreams-16', 'crt-glow-16', 'pixel-rain-16',
+    'synth-sunset-16', 'arcade-neon-16', 'cassette-future-16', 'dungeon-depths-16',
+    'forest-whisper-16', 'cavern-16', 'swamp-16', 'desolation-16', 'snowfall-16',
+    'meadow-16', 'prairie-16', 'savanna-16', 'jungle-16', 'reef-16', 'abyss-16',
+    'volcano-16', 'storm-16', 'aurora-16', 'eclipse-16', 'emberglow-16', 'rose-garden-16',
+    'lavastone-16', 'obsidian-16', 'marshmallow-16', 'coffee-shop-16', 'tea-room-16',
+    'bakery-16', 'cottagecore-16', 'dark-academia-16', 'light-academia-16',
+    'vintage-photo-16', 'sepia-16', 'film-noir-16', 'pastoral-16', 'storybook-16',
+    'pixeltoy-16', 'toybox-16', 'chalk-16', 'crayon-16', 'watercolor-16', 'oilpaint-16',
+    'inkwash-16', 'comicpop-16', 'animecel-16', 'waverator', 'touhou-pc-9801', 'faraway48',
+    'glomzy-06', 'old-z64', 'edg77', 'adventure28', 'nanner-jam', '24p-dx', 'meadowvale',
 ];
 
 const fetchLospecPalette = async (rawSlug) => {
@@ -1282,7 +1322,7 @@ const StepperInput = ({ value, onDecrease, onIncrease, onChange, onBlur, onKeyDo
 const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
     const categories = [...Object.keys(PRESET_PALETTES), 'Lospec'];
     const [activeCategory, setActiveCategory] = useState(categories[0]);
-    const [lospecSlug, setLospecSlug] = useState('');
+    const [lospecQuery, setLospecQuery] = useState('');
     const [lospecLoading, setLospecLoading] = useState('');
     const [lospecError, setLospecError] = useState('');
 
@@ -1303,6 +1343,12 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
         }
     };
 
+    // The query field doubles as a search filter and a direct slug-fetch input.
+    // Pressing Enter or clicking Load fetches the typed query verbatim; meanwhile
+    // the preset list filters live so users can scan ~290 entries quickly.
+    const q = lospecQuery.trim().toLowerCase();
+    const filteredPresets = q ? LOSPEC_PRESETS.filter(s => s.toLowerCase().includes(q)) : LOSPEC_PRESETS;
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
             <div className={`${styles.popover} w-full max-w-lg flex flex-col shadow-2xl`} style={{ maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
@@ -1314,7 +1360,7 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                     <Select styles={styles} value={safeCategory} onChange={e => { setActiveCategory(e.target.value); setLospecError(''); }} options={categories.map(c => ({value: c, label: c}))} />
                     {safeCategory === 'Lospec' ? (
                         <p className={`text-xs mt-2 italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                            Source: <a href="https://lospec.com/palette-list" target="_blank" rel="noreferrer" className="underline hover:text-neutral-300">lospec.com/palette-list</a> — fetched at click time via the Lospec public API.
+                            Source: <a href="https://lospec.com/palette-list" target="_blank" rel="noreferrer" className="underline hover:text-neutral-300">lospec.com/palette-list</a>. Fetched on click; a public CORS proxy (allorigins.win) is used as fallback since Lospec doesn't send CORS headers.
                         </p>
                     ) : PRESET_PALETTES[safeCategory]?._source && (
                         <p className={`text-xs mt-2 italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
@@ -1324,22 +1370,22 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                 </div>
 
                 {safeCategory === 'Lospec' ? (
-                    <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
-                        <div className={`flex gap-2 border p-3 ${isDark ? 'border-neutral-800' : 'border-neutral-200'}`}>
+                    <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-2">
+                        <div className={`flex gap-2 border p-3 sticky top-0 ${isDark ? 'border-neutral-800 bg-neutral-900' : 'border-neutral-200 bg-white'}`}>
                             <input
                                 type="text"
-                                value={lospecSlug}
-                                onChange={e => { setLospecSlug(e.target.value); setLospecError(''); }}
-                                onKeyDown={e => e.key === 'Enter' && handleFetchLospec(lospecSlug)}
-                                placeholder="Slug or URL (e.g. resurrect-64)"
+                                value={lospecQuery}
+                                onChange={e => { setLospecQuery(e.target.value); setLospecError(''); }}
+                                onKeyDown={e => e.key === 'Enter' && handleFetchLospec(lospecQuery)}
+                                placeholder="Filter or enter slug / URL"
                                 className={`flex-1 px-2 py-1 text-xs border bg-transparent focus:outline-none ${isDark ? 'border-neutral-700 text-neutral-200' : 'border-neutral-300 text-neutral-800'}`}
                             />
                             <button
-                                onClick={() => handleFetchLospec(lospecSlug)}
-                                disabled={!lospecSlug.trim() || lospecLoading === lospecSlug.trim()}
+                                onClick={() => handleFetchLospec(lospecQuery)}
+                                disabled={!lospecQuery.trim() || lospecLoading === lospecQuery.trim()}
                                 className={`px-3 py-1 text-xs font-bold uppercase border transition-colors ${isDark ? 'border-neutral-700 hover:bg-neutral-800 disabled:opacity-30' : 'border-neutral-300 hover:bg-neutral-100 disabled:opacity-30'}`}
                             >
-                                {lospecLoading === lospecSlug.trim() ? 'Loading…' : 'Load'}
+                                {lospecLoading === lospecQuery.trim() ? 'Loading…' : 'Load'}
                             </button>
                         </div>
                         {lospecError && (
@@ -1347,18 +1393,22 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                                 {lospecError}
                             </div>
                         )}
-                        <div className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-neutral-500' : 'text-neutral-400'} pt-2`}>Popular palettes</div>
-                        {LOSPEC_PRESETS.map(p => (
+                        <div className={`text-xs ${isDark ? 'text-neutral-500' : 'text-neutral-400'} pt-1 pb-1`}>
+                            {q ? `${filteredPresets.length} of ${LOSPEC_PRESETS.length} match "${q}"` : `Popular palettes (${LOSPEC_PRESETS.length}) — ordered by popularity`}
+                        </div>
+                        {filteredPresets.length === 0 && (
+                            <div className={`text-xs italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                                No preset matches. Press Load to fetch "{q}" directly from Lospec.
+                            </div>
+                        )}
+                        {filteredPresets.map(slug => (
                             <div
-                                key={p.slug}
-                                onClick={() => handleFetchLospec(p.slug)}
-                                className={`border p-3 cursor-pointer transition-all ${lospecLoading === p.slug ? 'opacity-50' : ''} ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'}`}
+                                key={slug}
+                                onClick={() => handleFetchLospec(slug)}
+                                className={`border px-3 py-2 cursor-pointer transition-all flex justify-between items-center ${lospecLoading === slug ? 'opacity-50' : ''} ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'}`}
                             >
-                                <div className="text-xs font-bold flex justify-between items-center">
-                                    <span className={isDark ? 'text-neutral-300' : 'text-neutral-700'}>{p.name}</span>
-                                    <span className={`text-neutral-500 font-normal`}>{lospecLoading === p.slug ? 'Fetching…' : p.author}</span>
-                                </div>
-                                <div className={`text-xs mt-0.5 ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>{p.slug}</div>
+                                <span className={`text-xs font-mono ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>{slug}</span>
+                                {lospecLoading === slug && <span className="text-xs text-neutral-500">Fetching…</span>}
                             </div>
                         ))}
                     </div>
@@ -1383,7 +1433,7 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
 };
 
 const ImageSetupPanel = ({ styles, isDark, settings, updateSetting, imageLoaded, onResetOriginalSize, isAnimation, isVideo }) => {
-    const showMatchMethod = settings.ditherCategory !== 'pattern' && settings.ditherSubMethod !== 'linear-projection' && settings.ditherSubMethod !== 'fw-dither' && settings.ditherSubMethod !== 'paper-beer-lambert' && settings.ditherSubMethod !== 'paper-mixbox';
+    const showMatchMethod = settings.ditherCategory !== 'pattern' && settings.ditherCategory !== 'geometric' && settings.ditherSubMethod !== 'linear-projection' && settings.ditherSubMethod !== 'fw-dither' && settings.ditherSubMethod !== 'paper-beer-lambert' && settings.ditherSubMethod !== 'paper-mixbox';
     return (
         <PanelSection styles={styles} title="Image Setup" action={
             imageLoaded ? <button onClick={onResetOriginalSize} className="text-xs uppercase font-bold text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 flex items-center gap-1"><RotateCcw size={10} /> Original</button> : null
@@ -2519,13 +2569,13 @@ export default function App() {
                       <>
                           <IconButton
                               styles={styles}
-                              icon={Film}
+                              icon={ImagePlay}
                               onClick={handleRenderGif}
                               title="Render as Animated GIF"
                           />
                           <IconButton
                               styles={styles}
-                              icon={Video}
+                              icon={Film}
                               onClick={handleRenderVideo}
                               title="Render as Video (WebM/MP4)"
                           />
