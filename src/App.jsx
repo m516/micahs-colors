@@ -113,68 +113,73 @@ const ColorSpaceConverter = {
 const SPACE_SCALES = { srgb: 255, linear: 1, oklab: 1, lab: 100, yuv: 255 };
 
 // Popularity-ordered list of Lospec palette slugs. Source: lospec.com/palette-list
-// sorted by popularity. Stored as bare strings rather than {slug,name,author} objects
-// because the modal already shows the slug (which is the primary identifier) and
-// fetching the JSON gives us the real name + author on click. Some entries may be
-// retired or misspelled -- the fetch handles 404s gracefully with an inline error.
+// sorted by popularity. The fetch handles 404s gracefully with an inline error, so
+// retired or misspelled entries simply show "not found" on click rather than breaking.
 const LOSPEC_PRESETS = [
     'resurrect-64', 'endesga-32', 'apollo', 'lospec500', 'endesga-64', 'cc-29', 'slso8',
-    'pear36', 'aap-64', 'oil-6', 'na16', 'island-joy-16', 'kirokazegb', 'sweetie-16',
-    'journey', 'pollen8', 'dawnbringer-32', 'fantasy-24', 'nanner-32', 'fading-16',
-    'rustic-gb', 'mulfok32', 'arq4x', 'funkyfuture-8', 'mist-gb', 'vine-gb', 'pico-8',
-    'dawnbringer-16', 'vinik24', 'bubblegum-16', 'hept32', 'jellybeans', 'famicube',
-    'endesga-36', 'borkfest', 'nanner-jam-2', 'twilioquest-76', 'ammo-8', 'paper-8',
-    'steam-lords', 'azurestar33', '2bit-demichrome', 'aap-splendor128', 'hollow',
-    'furryrama', 'vines-flexible-linear-ramps', 'cga-palette-1', 'cga-palette-2',
-    'endesga-soft32', 'cmykgb', 'matt36', 'pixel-ink', '1bit-monitor-glow',
-    'japanese-woodblock-12', 'twilight-5', 'courtyard-21', 'moondrom',
-    '2bit-demichrome-plus', 'lava-gb', 'night-16', 'ice-cream-gb', 'retro-bubble',
-    'purplemorning8', 'starlight-64', 'lux2k', 'nostalgia', 'lux3k', 'frost-16',
-    'softmilk-32', 'vanilla-milkshake', 'fleja-master-palette', 'wish-64', 'splendor128',
-    'dreamscape8', 'fresh24', 'beach-day', 'pastel-64', 'sls08', 'microsoft-windows-20',
-    'pokewilds-battle', 'pokewilds-overworld', 'copper-tech', 'sunlit-days',
-    'midnight-ablaze', 'galaxy-flame', 'wish64', 'hocus-pocus', 'lost-century', 'cafe24',
-    'woodland16', 'rainbow32', 'solarized-dark-16', 'solarized-light-16', 'desert-32',
-    'furyfest', 'velvet-cherry', 'wintermute', 'c64', 'comfy-16', 'retrowave-gb',
-    'sakura-gb', 'radical-snail', 'magma-8', 'sunset-red', 'nord', 'cinnamon-8',
-    'dango-16', 'minty-16', 'kiwi-8', 'pastel-gb', 'forest-8', 'melon-16', 'berry-8',
-    'cotton-candy-16', 'cyberpunk-16', 'warm-autumn-16', 'coldfire-16', 'nightshade-16',
-    'vaporwave-16', 'oceanic-16', 'neon-16', 'retrocal-8', 'sunbeam-16', 'monochrome-8',
-    'pixel-paradise-16', 'ancient-16', 'mystic-16', 'ember-16', 'foggy-8', 'grim-night-16',
-    'lush-16', 'heavenly-16', 'muddy-16', 'dreamy-16', 'floral-16', 'candyshop-16',
-    'forest-moss-8', 'sunrise-16', 'toxic-16', 'midori-16', 'frozen-16', 'sandy-16',
-    'pixelgarden-16', 'halloween-16', 'grape-8', 'spacehaze', 'sweet-canyon-extended-64',
-    'sweet-canyon-16', 'everforest-16', 'autumn-kiss-16', 'mushroom-16', 'nature-16',
-    'crimson-16', 'blueberry-16', 'pastel-sunset-16', 'voltage-16', 'paperback-2',
-    'twilight-bit-7', 'neapolitan-16', 'synthwave-16', 'forestberry-16', 'heavenscape-16',
-    'sunburn-16', 'wildflower-16', 'cozy-16', 'misty-16', 'toxic-garden-16', 'soda-pop-16',
-    'cherry-milk-16', 'frostbite-16', 'lavender-fields-16', 'spring-bloom-16',
-    'moonlight-16', 'dusk-16', 'peachy-16', 'pixel-dreams-16', 'retro-summer-16',
-    'midnight-city-16', 'forest-fire-16', 'berry-smoothie-16', 'sage57', 'jehkoba32',
-    'grim32', 'mellow-16', 'taffy-16', 'summers-past-16', 'z64', 'rewild-64', 'arch',
-    'ludpiratepalette128', 'blk-aqu4', 'general', 'pokemon-gb', 'pokemon-rby',
-    'pokemon-gsc', 'pokemon-rse', 'pokemon-dpp', 'pokemon-hgss', 'pokemon-bw',
-    'pokemon-b2w2', 'pokemon-xy', 'pokemon-sm', 'pokemon-swsh', 'pokemon-sv', 'kirby-gb',
-    'zelda-gb', 'metroid-gb', 'mario-gb', 'earthbound-16', 'chrono-trigger-16', 'ff6-16',
-    'secret-of-mana-16', 'mana-seed-16', 'octopath-16', 'undertale-16', 'deltarune-16',
-    'celeste-16', 'hyper-light-16', 'dead-cells-16', 'hades-16', 'gris-16', 'ori-16',
-    'hollow-knight-16', 'shovel-knight-16', 'sonic-16', 'mega-man-16', 'castlevania-16',
-    'contra-16', 'doom-16', 'quake-16', 'diablo-16', 'warcraft-16', 'starcraft-16',
-    'age-of-empires-16', 'simcity-16', 'rollercoaster-16', 'minecraft-16', 'terraria-16',
-    'stardew-16', 'animal-crossing-16', 'splatoon-16', 'portal-16', 'half-life-16',
-    'bioshock-16', 'fallout-16', 'skyrim-16', 'oblivion-16', 'morrowind-16',
-    'cyberdream-16', 'retrofuture-16', 'analog-dreams-16', 'crt-glow-16', 'pixel-rain-16',
-    'synth-sunset-16', 'arcade-neon-16', 'cassette-future-16', 'dungeon-depths-16',
-    'forest-whisper-16', 'cavern-16', 'swamp-16', 'desolation-16', 'snowfall-16',
-    'meadow-16', 'prairie-16', 'savanna-16', 'jungle-16', 'reef-16', 'abyss-16',
-    'volcano-16', 'storm-16', 'aurora-16', 'eclipse-16', 'emberglow-16', 'rose-garden-16',
-    'lavastone-16', 'obsidian-16', 'marshmallow-16', 'coffee-shop-16', 'tea-room-16',
-    'bakery-16', 'cottagecore-16', 'dark-academia-16', 'light-academia-16',
-    'vintage-photo-16', 'sepia-16', 'film-noir-16', 'pastoral-16', 'storybook-16',
-    'pixeltoy-16', 'toybox-16', 'chalk-16', 'crayon-16', 'watercolor-16', 'oilpaint-16',
-    'inkwash-16', 'comicpop-16', 'animecel-16', 'waverator', 'touhou-pc-9801', 'faraway48',
-    'glomzy-06', 'old-z64', 'edg77', 'adventure28', 'nanner-jam', '24p-dx', 'meadowvale',
+    'pear36', 'aap-64', 'oil-6', 'duel', 'sweetie-16', '31', 'pico-8', 'vinik24',
+    'fantasy-24', 'journey', 'nintendo-entertainment-system', 'lost-century', 'zughy-32',
+    'na16', 'mulfok32', 'midnight-ablaze', '1bit-monitor-glow', 'wplace-palette-free-colours',
+    'twilight-5', 'steam-lords', 'nyx8', 'aurora', 'famicube', 'blk-nx64', 'waldgeist',
+    'blessing', 'wplace-colors', 'eulbink', 'rust-gold-8', 'ice-cream-gb', 'ammo-8',
+    'kirokaze-gameboy', '2bit-demichrome', 'borkfest', 'lux2k', 'dawnbringer-32',
+    'twilioquest-76', 'mushroom', 'island-joy-16', 'comfort44s', 'jehkoba64', 'resurrect-32',
+    'chocomilk-8', 'pollen8', 'justparchment8', 'chasm', 'blk-neo', 'aap-splendor128',
+    'lava-gb', 'berry-nebula', 'hollow', 'indecision', 'japanese-woodblock', 'comfy52',
+    'nanner-pancakes', 'endesga-16', 'vines-flexible-linear-ramps', 'matt36', 'dreamscape8',
+    'windows-95-256-colours', 'ink', 'funkyfuture-8', 'pico-8-secret-palette', 'sheltzy32',
+    'vanilla-milkshake', 'inkpink', 'mist-gb', 'fleja-master-palette', 'curiosities',
+    'moonlight-gb', 'ink-crimson', 'bubblegum-16', 'citrink', 'aerugo', 'cl8uds',
+    'gothic-bit', 'srb2', 'commodore64', 'rosy-42', 'rustic-gb', 'nanner-32', 'fading-16',
+    'downgraded-32', 'ayy4', 'endesga-36', 'lux3k', 'nintendo-gameboy-bgb', 'cryptic-ocean',
+    'the-perfect-palette-20', 'punolite-plus-remake', 'hope-diamond', 'wish-gb',
+    '2-bit-grayscale', 'afr-32', 'pineapple-32', 'gora63', 'dawnbringer-16', 'nostalgia',
+    'bloodmoon21', 'lost-century-24', 'softmilk-32', 'hept32', 'blk-36', 'crimson',
+    'nopal-12', 'paper-8', 'fantasy', 'dream-haze-8', 'sonic-robo-blast-2-v22',
+    'slso-clr17', 'iridescent-crystal', 'microsoft-windows', 'juice56', 'lospec-2000',
+    'luap-40', 'late-night-bath', 'calm-48', 'ephemera', 'pastel-qt',
+    'hot-highlights-cold-shadows', 'paperback-2', 'sweet-canyon-extended-64', 'playpal',
+    'capp-5', 'blk-aqu4', 'grim32', 'spacehaze', 'dawnbringers-8-color', 'grayscale-16',
+    'tranquil-fantasy-23', 'darkseed-16', 'retrocal-8', 'cretaceous-16', 'minecraft-64',
+    'mega-drive-blue', 'winter-wonderland', 'seafoam', 'grape-soda', 'sirens-at-night',
+    'velvet-cherry-gb', 'jehkoba32', 'sage57', 'cyclope6', 'bastille-8', 'slimy-05',
+    'arq4', 'galaxy-flame', 'zenit-241', 'dreamy-forest', 'color-graphics-adapter',
+    'lacking64', 'equpix15', 'nes-advanced', 'fairydust-8', 'pokemon-sgb', 'golden-helmet',
+    'sunset-red', 'links-awakening-sgb', 'nicole-punk-82', 'bittersweet', 'florentine24',
+    'minecraft-map-palette-for-117', 'soda-cap', 'neon-space', 'atropoeia',
+    'the-y-gigante-reverted', 'shovel-knight-nes', 'titanstone', 'nes-aesprite', 'rewild-64',
+    'gold-gb', 'aap-micro12', 'fiery-plague-gb', 'sunset', 'wlk44-v2', 'tofu-20k',
+    'axulart-32-color-palette', '6-bit-rgb', 'juice32', 'cheese-palette', 'leopolds-dreams',
+    'archimedes-64', 'smooth-polished-gold', 'nightsky-bricks', 'hallowpumpkin', 'punolit',
+    'calm-sunset', 'pokemon-ruby-sapphire-exterior', 'pastel-64', 'dynasty38',
+    'arcade-standard-29', 'atari-8-bit-family-gtia', 'uncured-official', 'deep-maze',
+    'nymph-gb', 'nintendo-super-gameboy', 'miyazaki-16', 'carnival-32', 'glomzy-05',
+    'purplemorning8', 'ufo-50', 'moonlight-15', 'quake', 'the-crow', 'gray-weather',
+    'punolite-plus-plus', 'pola5', 'sunraze', 'bluem0ld', 'fuzzyfour', 'marshmellow32',
+    'dnot-froget', 'mojave20', 'autumn-decay', 'golden-flame', 'linear-color-palette-basic',
+    'mort-vs-zughy', 'custodian-8', 'dustbyte', 'gob-48', 'lospec-gb', 'aquaverse',
+    'supernova-7', 'summers-past-16', 'red-blood-pain', 'andrade-gameboy', 'sweet24',
+    'coldfire-gb', 'dead-weight-8', 'hydrangea-11', 'sonic-mania-main-palette', 'toasted40',
+    'sobeachy8', 'archerer48', 'autumn-harvest-37', 'cloudfrenzy', 'dynamite',
+    'antiquity16', 'shido-cyberneon', 'greenstar32', 'en4', 'aren32', 'arch',
+    'ludpiratepalette128', 'wintercode', 'diverse-natural', 'otterisk-96', 'akc12',
+    'soapy-10', 'smooth-polished-silver', 'uzebox', 'odd-feeling', 'poisson-23', 'smoky-09',
+    'parchment-and-ink', 'taffy-16', 'general', 'bath-house', 'crayola84', 'cybergum6',
+    'mahyellaw-22', 'brazilian-afternoon', 'sailor-moon-background', 'heart4', 'purpledawn',
+    'pax-24', 'gun-metal-russia', 'the-wood', 'fluffy8', 'cga-palette-1-high', 'zx-spectrum',
+    'abyss-9', 'molten', 'isas-true-master-palette', 'clement-8', 'the-perfect-palette',
+    'matriax8c', 'hot-sand-6', 'cs112-v2', 'retrotronic', 'skin-neutral-colors', 'r-place',
+    'aap-radiantplus', 'waverator', 'touhou-pc-9801', 'faraway48', 'glomzy-06', 'old-z64',
+    'edg77', 'adventure28', 'nanner-jam', '24p-dx', 'meadowvale',
 ];
+
+// Per-session preview cache for Lospec palettes. Module-level so it survives modal
+// open/close. Each entry is either { name, author, colors } on success or { error }
+// on failure. Cleared on page reload.
+const lospecPreviewCache = new Map();
+// Tracks slugs whose fetch is currently in flight, so React strict-mode's
+// double-effect-invoke doesn't trigger two parallel requests for the same slug.
+const lospecPreviewInFlight = new Set();
 
 const fetchLospecPalette = async (rawSlug) => {
     // Parse the slug from any of:
@@ -1325,16 +1330,53 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
     const [lospecQuery, setLospecQuery] = useState('');
     const [lospecLoading, setLospecLoading] = useState('');
     const [lospecError, setLospecError] = useState('');
-
-    if (!isOpen) return null;
+    const [shuffleSlugs, setShuffleSlugs] = useState(null); // null = no active shuffle
+    // Bumped after each background preview fetch so the modal re-renders with new cache data.
+    const [, setPreviewVersion] = useState(0);
 
     const safeCategory = categories.includes(activeCategory) ? activeCategory : categories[0];
+
+    // Compute filter results and preview-pane slugs every render. Pure functions of
+    // (lospecQuery, shuffleSlugs); cheap given list size.
+    const q = lospecQuery.trim().toLowerCase();
+    const filteredPresets = q ? LOSPEC_PRESETS.filter(s => s.toLowerCase().includes(q)) : LOSPEC_PRESETS;
+    // Preview rule: when filter narrows to ≤3 (and isn't empty), preview those.
+    // Else if user has shuffled, preview the shuffle picks. Else preview top-3 by popularity.
+    // This bounds the live request count to 3 per state transition.
+    let previewSlugs;
+    if (q && filteredPresets.length <= 3) previewSlugs = filteredPresets;
+    else if (shuffleSlugs) previewSlugs = shuffleSlugs;
+    else previewSlugs = LOSPEC_PRESETS.slice(0, 3);
+
+    // Background-fetch any preview slugs not already cached or in flight.
+    // Module-level cache+inflight survives modal close/reopen and Strict-mode double-invoke.
+    useEffect(() => {
+        if (!isOpen || safeCategory !== 'Lospec') return;
+        previewSlugs.forEach(slug => {
+            if (lospecPreviewCache.has(slug) || lospecPreviewInFlight.has(slug)) return;
+            lospecPreviewInFlight.add(slug);
+            (async () => {
+                try {
+                    const data = await fetchLospecPalette(slug);
+                    lospecPreviewCache.set(slug, data);
+                } catch (e) {
+                    lospecPreviewCache.set(slug, { error: e.message || String(e) });
+                } finally {
+                    lospecPreviewInFlight.delete(slug);
+                    setPreviewVersion(v => v + 1);
+                }
+            })();
+        });
+    }, [isOpen, safeCategory, previewSlugs.join('|')]);
+
+    if (!isOpen) return null;
 
     const handleFetchLospec = async (slug) => {
         if (!slug) return;
         setLospecLoading(slug); setLospecError('');
         try {
             const data = await fetchLospecPalette(slug);
+            lospecPreviewCache.set(slug, data); // warm cache for future modal opens
             onApply(data.colors);
         } catch (e) {
             setLospecError(e.message || String(e));
@@ -1343,11 +1385,65 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
         }
     };
 
-    // The query field doubles as a search filter and a direct slug-fetch input.
-    // Pressing Enter or clicking Load fetches the typed query verbatim; meanwhile
-    // the preset list filters live so users can scan ~290 entries quickly.
-    const q = lospecQuery.trim().toLowerCase();
-    const filteredPresets = q ? LOSPEC_PRESETS.filter(s => s.toLowerCase().includes(q)) : LOSPEC_PRESETS;
+    // Re-roll the preview pane: pick 3 random slugs (without replacement). Clears any
+    // active filter so previewSlugs derivation lands on the shuffle branch.
+    const handleShuffle = () => {
+        const picks = [];
+        const pool = [...LOSPEC_PRESETS];
+        for (let i = 0; i < 3 && pool.length > 0; i++) {
+            const idx = Math.floor(Math.random() * pool.length);
+            picks.push(pool.splice(idx, 1)[0]);
+        }
+        setShuffleSlugs(picks);
+        setLospecQuery('');
+        setLospecError('');
+    };
+
+    const handleQueryChange = (e) => {
+        setLospecQuery(e.target.value);
+        setShuffleSlugs(null); // typing always exits shuffle mode
+        setLospecError('');
+    };
+
+    // Renders a clickable preview card. Three visual states: loading (cache miss),
+    // error (cached as {error}), loaded (cached as {name, author, colors}).
+    const PreviewCard = ({ slug }) => {
+        const cached = lospecPreviewCache.get(slug);
+        const colors = cached?.colors;
+        const error = cached?.error;
+        const clickable = !!colors;
+        return (
+            <div
+                onClick={() => clickable && onApply(colors)}
+                className={`border p-3 transition-all ${clickable ? 'cursor-pointer' : 'cursor-default'} ${error ? 'opacity-60' : ''} ${isDark ? `border-neutral-800 ${clickable ? 'hover:bg-neutral-800' : ''}` : `border-neutral-200 ${clickable ? 'hover:bg-neutral-50' : ''}`}`}
+            >
+                <div className="flex justify-between items-baseline text-xs mb-1.5 gap-2">
+                    <span className={`font-mono font-bold truncate ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>{slug}</span>
+                    <span className={`font-normal flex-shrink-0 ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                        {!cached ? 'Loading…' :
+                         error ? 'Unavailable' :
+                         `${cached.author ? cached.author + ' · ' : ''}${colors.length} colors`}
+                    </span>
+                </div>
+                {colors && (
+                    <div className="grid gap-0 overflow-hidden shadow-sm border border-transparent"
+                         style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(4, 100/colors.length)}%, 1fr))`,
+                                  height: colors.length > 64 ? '64px' : colors.length > 32 ? '48px' : '32px' }}>
+                        {colors.map((c, i) => <div key={i} style={{backgroundColor: c, width: '100%', height: '100%'}} />)}
+                    </div>
+                )}
+                {error && <div className={`text-xs italic ${isDark ? 'text-red-400' : 'text-red-600'}`}>{error}</div>}
+                {!cached && <div className={`h-8 animate-pulse ${isDark ? 'bg-neutral-800/50' : 'bg-neutral-200/50'}`} />}
+            </div>
+        );
+    };
+
+    const previewHeading =
+        q && filteredPresets.length <= 3
+            ? `Preview · ${filteredPresets.length} match${filteredPresets.length === 1 ? '' : 'es'} for "${q}"`
+            : shuffleSlugs
+                ? 'Preview · 3 random palettes'
+                : 'Preview · top by popularity';
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
@@ -1360,7 +1456,7 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                     <Select styles={styles} value={safeCategory} onChange={e => { setActiveCategory(e.target.value); setLospecError(''); }} options={categories.map(c => ({value: c, label: c}))} />
                     {safeCategory === 'Lospec' ? (
                         <p className={`text-xs mt-2 italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                            Source: <a href="https://lospec.com/palette-list" target="_blank" rel="noreferrer" className="underline hover:text-neutral-300">lospec.com/palette-list</a>. Fetched on click; a public CORS proxy (allorigins.win) is used as fallback since Lospec doesn't send CORS headers.
+                            Source: <a href="https://lospec.com/palette-list" target="_blank" rel="noreferrer" className="underline hover:text-neutral-300">lospec.com/palette-list</a>. Previews fetch only the 3 visible cards; narrow the filter or hit Shuffle to swap them.
                         </p>
                     ) : PRESET_PALETTES[safeCategory]?._source && (
                         <p className={`text-xs mt-2 italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
@@ -1370,16 +1466,23 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                 </div>
 
                 {safeCategory === 'Lospec' ? (
-                    <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-2">
-                        <div className={`flex gap-2 border p-3 sticky top-0 ${isDark ? 'border-neutral-800 bg-neutral-900' : 'border-neutral-200 bg-white'}`}>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                        <div className={`flex gap-2 border p-2 sticky top-0 z-10 ${isDark ? 'border-neutral-800 bg-neutral-900' : 'border-neutral-200 bg-white'}`}>
                             <input
                                 type="text"
                                 value={lospecQuery}
-                                onChange={e => { setLospecQuery(e.target.value); setLospecError(''); }}
+                                onChange={handleQueryChange}
                                 onKeyDown={e => e.key === 'Enter' && handleFetchLospec(lospecQuery)}
                                 placeholder="Filter or enter slug / URL"
                                 className={`flex-1 px-2 py-1 text-xs border bg-transparent focus:outline-none ${isDark ? 'border-neutral-700 text-neutral-200' : 'border-neutral-300 text-neutral-800'}`}
                             />
+                            <button
+                                onClick={handleShuffle}
+                                title="Shuffle: roll 3 random palettes to preview"
+                                className={`px-2 py-1 text-xs border transition-colors flex items-center ${isDark ? 'border-neutral-700 hover:bg-neutral-800 text-neutral-300' : 'border-neutral-300 hover:bg-neutral-100 text-neutral-700'}`}
+                            >
+                                <Dices size={12} />
+                            </button>
                             <button
                                 onClick={() => handleFetchLospec(lospecQuery)}
                                 disabled={!lospecQuery.trim() || lospecLoading === lospecQuery.trim()}
@@ -1388,29 +1491,46 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                                 {lospecLoading === lospecQuery.trim() ? 'Loading…' : 'Load'}
                             </button>
                         </div>
+
                         {lospecError && (
-                            <div className={`text-xs p-2 border ${isDark ? 'border-red-900 bg-red-950/40 text-red-300' : 'border-red-200 bg-red-50 text-red-700'}`}>
+                            <div className={`text-xs p-2 border mt-2 ${isDark ? 'border-red-900 bg-red-950/40 text-red-300' : 'border-red-200 bg-red-50 text-red-700'}`}>
                                 {lospecError}
                             </div>
                         )}
-                        <div className={`text-xs ${isDark ? 'text-neutral-500' : 'text-neutral-400'} pt-1 pb-1`}>
-                            {q ? `${filteredPresets.length} of ${LOSPEC_PRESETS.length} match "${q}"` : `Popular palettes (${LOSPEC_PRESETS.length}) — ordered by popularity`}
-                        </div>
-                        {filteredPresets.length === 0 && (
-                            <div className={`text-xs italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                                No preset matches. Press Load to fetch "{q}" directly from Lospec.
+
+                        {previewSlugs.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                                <div className={`text-xs uppercase tracking-wider font-bold ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                                    {previewHeading}
+                                </div>
+                                {previewSlugs.map(slug => <PreviewCard key={slug} slug={slug} />)}
                             </div>
                         )}
-                        {filteredPresets.map(slug => (
-                            <div
-                                key={slug}
-                                onClick={() => handleFetchLospec(slug)}
-                                className={`border px-3 py-2 cursor-pointer transition-all flex justify-between items-center ${lospecLoading === slug ? 'opacity-50' : ''} ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'}`}
-                            >
-                                <span className={`text-xs font-mono ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>{slug}</span>
-                                {lospecLoading === slug && <span className="text-xs text-neutral-500">Fetching…</span>}
+
+                        <div className={`mt-4 text-xs uppercase tracking-wider font-bold ${isDark ? 'text-neutral-500' : 'text-neutral-400'} mb-2`}>
+                            {q
+                                ? `${filteredPresets.length} of ${LOSPEC_PRESETS.length} match "${q}"`
+                                : `Full list · ${LOSPEC_PRESETS.length} palettes by popularity`}
+                            <span className="font-normal normal-case ml-1">· click to apply directly</span>
+                        </div>
+                        {filteredPresets.length === 0 ? (
+                            <div className={`text-xs italic p-3 border ${isDark ? 'border-neutral-800 text-neutral-500' : 'border-neutral-200 text-neutral-400'}`}>
+                                No preset matches. Press Load to fetch "{q}" from Lospec anyway.
                             </div>
-                        ))}
+                        ) : (
+                            <div className="space-y-1">
+                                {filteredPresets.map(slug => (
+                                    <div
+                                        key={slug}
+                                        onClick={() => handleFetchLospec(slug)}
+                                        className={`border px-3 py-2 cursor-pointer transition-all flex justify-between items-center ${lospecLoading === slug ? 'opacity-50' : ''} ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'}`}
+                                    >
+                                        <span className={`text-xs font-mono ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>{slug}</span>
+                                        {lospecLoading === slug && <span className="text-xs text-neutral-500">Fetching…</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
