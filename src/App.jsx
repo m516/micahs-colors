@@ -112,6 +112,45 @@ const ColorSpaceConverter = {
 
 const SPACE_SCALES = { srgb: 255, linear: 1, oklab: 1, lab: 100, yuv: 255 };
 
+// Curated list of popular Lospec palettes (lospec.com/palette-list/{slug}.json).
+// Slugs verified against the public listings; users can also enter their own slug
+// in the modal. Add to or reorder this list freely.
+const LOSPEC_PRESETS = [
+    { slug: 'resurrect-64',      name: 'Resurrect 64',     author: 'Kerrie Lake' },
+    { slug: 'apollo',            name: 'Apollo',           author: 'AdamCYounis' },
+    { slug: 'sweetie-16',        name: 'Sweetie 16',       author: 'GrafxKid' },
+    { slug: 'endesga-32',        name: 'Endesga 32',       author: 'Endesga' },
+    { slug: 'endesga-64',        name: 'Endesga 64',       author: 'Endesga' },
+    { slug: 'vinik24',           name: 'Vinik 24',         author: 'Vinik' },
+    { slug: 'na16',              name: 'NA16',             author: 'Nauris Amatnieks' },
+    { slug: 'pico-8',            name: 'PICO-8',           author: 'Lexaloffle' },
+    { slug: 'nyx8',              name: 'NYX8',             author: 'Javier Guerrero' },
+    { slug: 'journey',           name: 'Journey',          author: 'PineappleOnPizza' },
+    { slug: 'oil-6',             name: 'Oil 6',            author: 'GrafxKid' },
+    { slug: 'lospec500',         name: 'Lospec 500',       author: 'Lospec' },
+    { slug: '1bit-monitor-glow', name: '1-bit Monitor Glow', author: 'Polyducks' },
+    { slug: 'pear36',            name: 'PEAR36',           author: 'PineappleOnPizza' },
+    { slug: 'slso8',             name: 'SLSO8',            author: 'Luis Miguel Maldonado' },
+    { slug: 'kirokaze-gameboy',  name: 'Kirokaze GB',      author: 'Kirokaze' },
+    { slug: 'twilight-5',        name: 'Twilight 5',       author: 'GrafxKid' },
+    { slug: 'aap-64',            name: 'AAP-64',           author: 'Adigun A. Polack' },
+];
+
+const fetchLospecPalette = async (rawSlug) => {
+    // Lospec slugs are kebab-case alphanumeric. Accept either a slug or a full URL.
+    const fromUrl = rawSlug.match(/lospec\.com\/palette-list\/([a-z0-9-]+)/i);
+    const slug = (fromUrl ? fromUrl[1] : rawSlug).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    if (!slug) throw new Error('Empty or invalid slug.');
+    const url = `https://lospec.com/palette-list/${slug}.json`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Lospec returned ${res.status} for "${slug}"`);
+    const data = await res.json();
+    if (data?.error) throw new Error(data.error);
+    if (!Array.isArray(data?.colors)) throw new Error('Malformed response.');
+    // Lospec returns bare hex like "574368"; the rest of the app expects "#574368".
+    return { name: data.name || slug, author: data.author || '', colors: data.colors.map(c => '#' + c.replace(/^#/, '')) };
+};
+
 const PRESET_PALETTES = {
   "Nintendo Handhelds": {
     "_source": "Hardware constraints and BIOS presets",
@@ -958,95 +997,168 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
             }
         }
     } else if (ditherCategory === 'geometric') {
+        // N-candidate ordered dithering for irregular palettes.
+        // Reference: matejlou (2023), "Ordered Dithering with Arbitrary or Irregular Colour Palettes",
+        // https://matejlou.blog/2023/12/06/ordered-dithering-for-arbitrary-or-irregular-palettes/
+        //
+        // All four methods produce N candidate colours per pixel plus a weight per candidate, then
+        // (per matejlou's Appendix I) sort candidates by display luminance and threshold-sample via
+        // the Bayer matrix. The 'intensity' slider mixes the weight distribution toward a delta on
+        // the actually-nearest colour: intensity = 0 -> always pick the nearest (no dither),
+        // intensity = 1 -> the full per-method distribution.
         const reqSize = parseInt(bayerSize) || 8;
         const map = BAYER_MAPS[reqSize] || BAYER_MAPS[8];
         const mapSize = map.length || 8;
+        const intensity = clamp(dithering ?? 1, 0, 1);
+        const lum = c => 0.2126*c.displayR + 0.7152*c.displayG + 0.0722*c.displayB;
+
+        // Pre-compute a luminance-sorted permutation of the palette once. Used by fw-dither for the
+        // cumulative-threshold walk (Appendix I's "tally"-style optimisation).
+        const paletteByLuminance = workingPalette
+            .map((c, i) => [i, lum(c)])
+            .sort((a, b) => a[1] - b[1])
+            .map(x => x[0]);
+
+        // Common candidate-sampler shared by knoll / n-closest / n-convex. Mixes the weight
+        // distribution toward a delta on candidates[closestIndex], sorts by luminance, then
+        // samples via the cumulative threshold position given by bayerVal in [0, 1).
+        const sampleCandidates = (cands, weights, closestIndex, bayerVal) => {
+            const N = cands.length;
+            if (N === 0) return null;
+            const mixed = new Array(N);
+            let sumW = 0;
+            for (let i = 0; i < N; i++) {
+                const delta = (i === closestIndex) ? 1 : 0;
+                mixed[i] = (1 - intensity) * delta + intensity * weights[i];
+                sumW += mixed[i];
+            }
+            // Degenerate case: all weights collapsed to zero (intensity == 1 with all-zero IDW).
+            if (sumW <= 0) return cands[closestIndex >= 0 ? closestIndex : 0];
+            // Pair-sort by display luminance (Appendix I) -- this is what makes the dither
+            // patterns *visible* on irregular palettes.
+            const order = new Array(N);
+            for (let i = 0; i < N; i++) order[i] = i;
+            order.sort((a, b) => lum(cands[a]) - lum(cands[b]));
+            // Cumulative threshold sample.
+            let accum = 0;
+            for (const idx of order) {
+                accum += mixed[idx] / sumW;
+                if (bayerVal < accum) return cands[idx];
+            }
+            return cands[order[N - 1]];
+        };
+
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const idx = (y * width + x) * 4;
                 const j = (y * width + x) * D;
                 if (pixels[idx+3] < 128) continue;
-                
-                let v0 = wbuf[j], v1 = wbuf[j+1], v2 = wbuf[j+2];
+
+                const v0 = wbuf[j], v1 = wbuf[j+1], v2 = wbuf[j+2];
                 const bayerVal = (map[y % mapSize]?.[x % mapSize] || 0) / (mapSize * mapSize);
 
                 if (ditherSubMethod === 'knoll') {
-                    // Knoll, T., "Pattern dithering", US Patent 6,606,166 B1 (Adobe, 2003; expired 2019).
-                    // Step 1: generate N candidate colours by accumulating residual error.
+                    // Knoll, US Patent 6,606,166 B1 (Adobe, 2003; expired 2019). matejlou (2023)
+                    // describes it as: iterate N times allowing duplicates; the candidate weight
+                    // is its FREQUENCY in the resulting list.
                     let g0 = v0, g1 = v1, g2 = v2;
-                    const candidates = [];
+                    const cands = [];
                     for (let n = 0; n < validNCandidates; n++) {
                         const nearest = getNearestColor([g0, g1, g2]);
                         if (!nearest) break;
-                        candidates.push(nearest);
+                        cands.push(nearest);
                         g0 += (v0 - nearest.transformed[0]);
                         g1 += (v1 - nearest.transformed[1]);
                         g2 += (v2 - nearest.transformed[2]);
                     }
-                    // Step 2: sort by luminance (Claim 7) so the chosen index maps monotonically
-                    // to brightness. BT.709 luma is computed on the display RGB, not the working
-                    // colour space, since "luminance" in the patent means the perceived brightness.
-                    candidates.sort((a, b) =>
-                        (0.2126*a.displayR + 0.7152*a.displayG + 0.0722*a.displayB) -
-                        (0.2126*b.displayR + 0.7152*b.displayG + 0.0722*b.displayB)
-                    );
-                    // Step 3: select one candidate via the dither-ordering function. The patent
-                    // claims THREE valid choices: Bayer / blue-noise threshold (Claim 11), random
-                    // noise table (Claims 9-10), or unbiased random (Claim 12). We expose the
-                    // first two: ditherSeed > 0 routes to the legacy PRNG; ditherSeed == 0 (the
-                    // default) uses the Bayer threshold from the surrounding 'geometric' branch,
-                    // which gives noticeably smoother gradients.
-                    const N = candidates.length;
-                    let chosenIndex;
-                    if (settings.ditherSeed && settings.ditherSeed > 0) {
-                        chosenIndex = clamp(Math.floor(prng(x, y, settings.ditherSeed) * N), 0, N - 1);
-                    } else {
-                        chosenIndex = clamp(Math.floor(bayerVal * N), 0, N - 1);
+                    if (cands.length > 0) {
+                        // Frequency-as-weight: every entry contributes 1/N, so duplicates of the
+                        // same colour naturally sum into a higher selection probability.
+                        const w = 1 / cands.length;
+                        const weights = cands.map(() => w);
+                        // The first iteration's pick IS the nearest colour to the input pixel.
+                        const chosen = sampleCandidates(cands, weights, 0, bayerVal);
+                        if (chosen) { pixels[idx] = chosen.displayR; pixels[idx+1] = chosen.displayG; pixels[idx+2] = chosen.displayB; }
                     }
-                    const chosen = candidates[chosenIndex] || candidates[0];
-                    if (chosen) { pixels[idx] = chosen.displayR; pixels[idx+1] = chosen.displayG; pixels[idx+2] = chosen.displayB; }
-                } 
-                else if (ditherSubMethod === 'fw-dither') {
-                    const vArr = wbuf.subarray(j, j + D);
-                    runFW(vArr);
-                    let accum = 0;
-                    let chosen = workingPalette[0];
-                    for (let p = 0; p < workingPalette.length; p++) {
-                        if (fwWeights[p] > 0.001) {
-                            accum += fwWeights[p];
-                            if (bayerVal <= accum) { chosen = workingPalette[p]; break; }
-                        }
-                    }
-                    if (chosen) { pixels[idx] = chosen.displayR; pixels[idx+1] = chosen.displayG; pixels[idx+2] = chosen.displayB; }
                 }
                 else if (ditherSubMethod === 'n-closest') {
-                    const candidates = getNNearestColors([v0, v1, v2], validNCandidates);
-                    let sumWeights = 0;
-                    candidates.forEach(c => { c.weight = 1.0 / Math.pow(Math.max(c.dist, 0.001), safeDistExp); sumWeights += c.weight; });
-                    let accum = 0; let chosen = candidates[0]?.color;
-                    for (let c of candidates) {
-                        accum += (c.weight / sumWeights);
-                        if (bayerVal <= accum) { chosen = c.color || chosen; break; }
+                    // Lemström, Tarhio & Takala (1996), "Color Dithering with n-Best Algorithm".
+                    // N nearest palette colours; weight w_i = 1 / d_i^s where d is true Euclidean.
+                    const list = getNNearestColors([v0, v1, v2], validNCandidates);
+                    if (list.length > 0) {
+                        const cands = list.map(c => c.color);
+                        // getNNearestColors returns SQUARED distances; sqrt to get true d for 1/d^s.
+                        const weights = list.map(c => 1 / Math.pow(Math.max(Math.sqrt(c.dist), 1e-6), safeDistExp));
+                        // List is ascending-by-distance, so index 0 is the actually-nearest.
+                        const chosen = sampleCandidates(cands, weights, 0, bayerVal);
+                        if (chosen) { pixels[idx] = chosen.displayR; pixels[idx+1] = chosen.displayG; pixels[idx+2] = chosen.displayB; }
                     }
-                    if (chosen) { pixels[idx] = chosen.displayR; pixels[idx+1] = chosen.displayG; pixels[idx+2] = chosen.displayB; }
                 }
                 else if (ditherSubMethod === 'n-convex') {
+                    // Lemström & Fränti (2000), "N-Candidate methods for location invariant
+                    // dithering of color images". KEY difference from Knoll: candidates are
+                    // marked as USED (no duplicates), and weights are IDW on distance-to-input.
                     let g0 = v0, g1 = v1, g2 = v2;
-                    const candidates = [];
+                    const cands = [];
+                    const sqDists = [];
+                    const used = new Set();
                     for (let n = 0; n < validNCandidates; n++) {
-                        const nearest = getNearestColor([g0, g1, g2]);
-                        if (nearest) {
-                            const d0 = v0 - nearest.transformed[0], d1 = v1 - nearest.transformed[1], d2 = v2 - nearest.transformed[2];
-                            candidates.push({color: nearest, dist: d0*d0 + d1*d1 + d2*d2});
-                            g0 += (v0 - nearest.transformed[0]); g1 += (v1 - nearest.transformed[1]); g2 += (v2 - nearest.transformed[2]);
+                        // Find nearest *unused* palette colour to the running goal.
+                        let bestIdx = -1, bestDist = Infinity;
+                        for (let p = 0; p < workingPalette.length; p++) {
+                            if (used.has(p)) continue;
+                            const c = workingPalette[p].transformed;
+                            const a0 = c[0] - g0, a1 = c[1] - g1, a2 = c[2] - g2;
+                            const d = a0*a0 + a1*a1 + a2*a2;
+                            if (d < bestDist) { bestDist = d; bestIdx = p; }
                         }
+                        if (bestIdx < 0) break;
+                        used.add(bestIdx);
+                        const nearest = workingPalette[bestIdx];
+                        cands.push(nearest);
+                        // IDW weight uses distance to the ORIGINAL pixel (not to the goal).
+                        const d0 = v0 - nearest.transformed[0];
+                        const d1 = v1 - nearest.transformed[1];
+                        const d2 = v2 - nearest.transformed[2];
+                        sqDists.push(d0*d0 + d1*d1 + d2*d2);
+                        g0 += d0; g1 += d1; g2 += d2;
                     }
-                    let sumWeights = 0;
-                    candidates.forEach(c => { c.weight = 1.0 / Math.pow(Math.max(c.dist, 0.001), safeDistExp); sumWeights += c.weight; });
-                    let accum = 0; let chosen = candidates[0]?.color;
-                    for (let c of candidates) {
-                        accum += (c.weight / sumWeights);
-                        if (bayerVal <= accum) { chosen = c.color || chosen; break; }
+                    if (cands.length > 0) {
+                        const weights = sqDists.map(d => 1 / Math.pow(Math.max(Math.sqrt(d), 1e-6), safeDistExp));
+                        // First iteration picks the actual nearest -> closestIndex = 0.
+                        const chosen = sampleCandidates(cands, weights, 0, bayerVal);
+                        if (chosen) { pixels[idx] = chosen.displayR; pixels[idx+1] = chosen.displayG; pixels[idx+2] = chosen.displayB; }
+                    }
+                }
+                else if (ditherSubMethod === 'fw-dither') {
+                    // Frank-Wolfe weights span the ENTIRE palette (not just N candidates), so we
+                    // walk the palette in luminance order for the cumulative threshold rather
+                    // than building a small candidate list.
+                    const vArr = wbuf.subarray(j, j + D);
+                    runFW(vArr);
+                    // Locate the actual nearest palette colour for the intensity-mix delta.
+                    let closestIdx = 0, minDist = Infinity;
+                    for (let p = 0; p < workingPalette.length; p++) {
+                        const c = workingPalette[p].transformed;
+                        let d = 0;
+                        for (let k = 0; k < D; k++) { const diff = c[k] - vArr[k]; d += diff * diff; }
+                        if (d < minDist) { minDist = d; closestIdx = p; }
+                    }
+                    // Mix weights toward delta on closestIdx; walk in luminance order.
+                    let sumW = 0;
+                    const mixed = new Float32Array(workingPalette.length);
+                    for (let p = 0; p < workingPalette.length; p++) {
+                        const delta = (p === closestIdx) ? 1 : 0;
+                        mixed[p] = (1 - intensity) * delta + intensity * fwWeights[p];
+                        sumW += mixed[p];
+                    }
+                    let chosen = workingPalette[closestIdx];
+                    if (sumW > 0) {
+                        let accum = 0;
+                        for (const p of paletteByLuminance) {
+                            accum += mixed[p] / sumW;
+                            if (bayerVal < accum) { chosen = workingPalette[p]; break; }
+                        }
                     }
                     if (chosen) { pixels[idx] = chosen.displayR; pixels[idx+1] = chosen.displayG; pixels[idx+2] = chosen.displayB; }
                 }
@@ -1133,14 +1245,28 @@ const StepperInput = ({ value, onDecrease, onIncrease, onChange, onBlur, onKeyDo
 // ==========================================
 
 const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
-    const categories = Object.keys(PRESET_PALETTES);
+    const categories = [...Object.keys(PRESET_PALETTES), 'Lospec'];
     const [activeCategory, setActiveCategory] = useState(categories[0]);
+    const [lospecSlug, setLospecSlug] = useState('');
+    const [lospecLoading, setLospecLoading] = useState('');
+    const [lospecError, setLospecError] = useState('');
 
     if (!isOpen) return null;
-    
+
     const safeCategory = categories.includes(activeCategory) ? activeCategory : categories[0];
-    const categoryData = PRESET_PALETTES[safeCategory];
-    const paletteNames = Object.keys(categoryData).filter(k => k !== '_source');
+
+    const handleFetchLospec = async (slug) => {
+        if (!slug) return;
+        setLospecLoading(slug); setLospecError('');
+        try {
+            const data = await fetchLospecPalette(slug);
+            onApply(data.colors);
+        } catch (e) {
+            setLospecError(e.message || String(e));
+        } finally {
+            setLospecLoading('');
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
@@ -1150,26 +1276,72 @@ const PaletteLibraryModal = ({ isOpen, onClose, onApply, styles, isDark }) => {
                     <button onClick={onClose} className={`hover:text-neutral-600 ${isDark ? 'text-neutral-400 hover:text-neutral-200' : 'text-neutral-400'}`}><X size={16} /></button>
                 </div>
                 <div className="flex flex-col mb-4">
-                    <Select styles={styles} value={safeCategory} onChange={e => setActiveCategory(e.target.value)} options={categories.map(c => ({value: c, label: c}))} />
-                    {categoryData._source && (
+                    <Select styles={styles} value={safeCategory} onChange={e => { setActiveCategory(e.target.value); setLospecError(''); }} options={categories.map(c => ({value: c, label: c}))} />
+                    {safeCategory === 'Lospec' ? (
                         <p className={`text-xs mt-2 italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
-                            Source: {categoryData._source}
+                            Source: <a href="https://lospec.com/palette-list" target="_blank" rel="noreferrer" className="underline hover:text-neutral-300">lospec.com/palette-list</a> — fetched at click time via the Lospec public API.
+                        </p>
+                    ) : PRESET_PALETTES[safeCategory]?._source && (
+                        <p className={`text-xs mt-2 italic ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>
+                            Source: {PRESET_PALETTES[safeCategory]._source}
                         </p>
                     )}
                 </div>
-                <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
-                    {paletteNames.map((name) => {
-                        const colors = categoryData[name];
-                        return (
-                            <div key={name} className={`border p-3 cursor-pointer transition-all ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'}`} onClick={() => onApply(colors)}>
-                                <div className="text-xs font-bold mb-2 flex justify-between"><span className={isDark ? 'text-neutral-300' : 'text-neutral-700'}>{name}</span><span className="text-neutral-500">{colors.length} colors</span></div>
-                                <div className={`grid gap-0 overflow-hidden shadow-sm border border-transparent`} style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(4, 100/colors.length)}%, 1fr))`, height: colors.length > 32 ? '64px' : '32px' }}>
-                                    {colors.map((c, i) => <div key={i} style={{backgroundColor: c, width: '100%', height: '100%'}}></div>)}
-                                </div>
+
+                {safeCategory === 'Lospec' ? (
+                    <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
+                        <div className={`flex gap-2 border p-3 ${isDark ? 'border-neutral-800' : 'border-neutral-200'}`}>
+                            <input
+                                type="text"
+                                value={lospecSlug}
+                                onChange={e => { setLospecSlug(e.target.value); setLospecError(''); }}
+                                onKeyDown={e => e.key === 'Enter' && handleFetchLospec(lospecSlug)}
+                                placeholder="Slug or URL (e.g. resurrect-64)"
+                                className={`flex-1 px-2 py-1 text-xs border bg-transparent focus:outline-none ${isDark ? 'border-neutral-700 text-neutral-200' : 'border-neutral-300 text-neutral-800'}`}
+                            />
+                            <button
+                                onClick={() => handleFetchLospec(lospecSlug)}
+                                disabled={!lospecSlug.trim() || lospecLoading === lospecSlug.trim()}
+                                className={`px-3 py-1 text-xs font-bold uppercase border transition-colors ${isDark ? 'border-neutral-700 hover:bg-neutral-800 disabled:opacity-30' : 'border-neutral-300 hover:bg-neutral-100 disabled:opacity-30'}`}
+                            >
+                                {lospecLoading === lospecSlug.trim() ? 'Loading…' : 'Load'}
+                            </button>
+                        </div>
+                        {lospecError && (
+                            <div className={`text-xs p-2 border ${isDark ? 'border-red-900 bg-red-950/40 text-red-300' : 'border-red-200 bg-red-50 text-red-700'}`}>
+                                {lospecError}
                             </div>
-                        );
-                    })}
-                </div>
+                        )}
+                        <div className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-neutral-500' : 'text-neutral-400'} pt-2`}>Popular palettes</div>
+                        {LOSPEC_PRESETS.map(p => (
+                            <div
+                                key={p.slug}
+                                onClick={() => handleFetchLospec(p.slug)}
+                                className={`border p-3 cursor-pointer transition-all ${lospecLoading === p.slug ? 'opacity-50' : ''} ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'}`}
+                            >
+                                <div className="text-xs font-bold flex justify-between items-center">
+                                    <span className={isDark ? 'text-neutral-300' : 'text-neutral-700'}>{p.name}</span>
+                                    <span className={`text-neutral-500 font-normal`}>{lospecLoading === p.slug ? 'Fetching…' : p.author}</span>
+                                </div>
+                                <div className={`text-xs mt-0.5 ${isDark ? 'text-neutral-500' : 'text-neutral-400'}`}>{p.slug}</div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
+                        {Object.keys(PRESET_PALETTES[safeCategory] || {}).filter(k => k !== '_source').map((name) => {
+                            const colors = PRESET_PALETTES[safeCategory][name];
+                            return (
+                                <div key={name} className={`border p-3 cursor-pointer transition-all ${isDark ? 'border-neutral-800 hover:bg-neutral-800' : 'border-neutral-200 hover:bg-neutral-50'}`} onClick={() => onApply(colors)}>
+                                    <div className="text-xs font-bold mb-2 flex justify-between"><span className={isDark ? 'text-neutral-300' : 'text-neutral-700'}>{name}</span><span className="text-neutral-500">{colors.length} colors</span></div>
+                                    <div className={`grid gap-0 overflow-hidden shadow-sm border border-transparent`} style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(4, 100/colors.length)}%, 1fr))`, height: colors.length > 32 ? '64px' : '32px' }}>
+                                        {colors.map((c, i) => <div key={i} style={{backgroundColor: c, width: '100%', height: '100%'}}></div>)}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -1226,8 +1398,24 @@ const PalettePanel = ({ styles, isDark, settings, updateSetting, paletteData, on
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [tempColorCount, setTempColorCount] = useState(settings.paletteSize.toString());
     const paletteImportRef = useRef(null); const extractInputRef = useRef(null);
+    const exportMenuRef = useRef(null);
     useEffect(() => setTempColorCount(settings.paletteSize.toString()), [settings.paletteSize]);
     const applyColorCount = (val) => { let num = clamp(parseInt(val) || 2, 2, 256); updateSetting('paletteSize', num); setTempColorCount(num.toString()); };
+
+    // Close the export dropdown on any click/touch outside its container, or on Escape.
+    useEffect(() => {
+        if (!showExportMenu) return;
+        const onDown = (e) => { if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) setShowExportMenu(false); };
+        const onKey = (e) => { if (e.key === 'Escape') setShowExportMenu(false); };
+        document.addEventListener('mousedown', onDown);
+        document.addEventListener('touchstart', onDown);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('mousedown', onDown);
+            document.removeEventListener('touchstart', onDown);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [showExportMenu]);
 
     const EXPORT_OPTIONS = (settings.ditherCategory === 'analytical' && settings.ditherSubMethod !== 'best-match')
         ? ['hex', 'json', 'gpl', 'zip: Color', 'zip: B&W']
@@ -1241,8 +1429,8 @@ const PalettePanel = ({ styles, isDark, settings, updateSetting, paletteData, on
                     <IconButton styles={styles} icon={Unlock} onClick={() => onPaletteAction.toggleAllLocks(false)} title="Unlock All" />
                     <div className={`w-px h-3 mx-1.5 ${isDark ? 'bg-neutral-700' : 'bg-neutral-300'}`}></div>
                     <IconButton styles={styles} icon={FolderOpen} onClick={() => paletteImportRef.current?.click()} title="Import Palette File" />
-                    <input type="file" ref={paletteImportRef} className="hidden" accept=".json,.hex,.gpl" onChange={onPaletteAction.import} />
-                    <div className="relative">
+                    <input type="file" ref={paletteImportRef} className="hidden" accept=".json,.hex,.gpl,.pal,.txt" onChange={(e) => { onPaletteAction.import(e.target.files?.[0]); e.target.value = null; }} />
+                    <div className="relative" ref={exportMenuRef}>
                         <IconButton styles={styles} icon={Save} onClick={() => setShowExportMenu(!showExportMenu)} title="Export Palette" />
                         {showExportMenu && (
                             <div className={`absolute top-full left-0 mt-1 w-56 text-xs shadow-xl z-50 flex flex-col border ${isDark ? 'bg-neutral-800 border-neutral-700' : 'bg-white border-neutral-200'}`}>
@@ -2172,20 +2360,33 @@ export default function App() {
       }
   };
 
-  const handlePaletteImport = (e) => {
-    const file = e.target.files[0]; if (!file) return;
+  // Accepts a File (from <input> change, drag-drop, or fetch from Lospec). Parses any text
+  // file containing hex codes (.hex / .gpl / .pal / .json all work) -- it's a regex-and-go
+  // approach, not strict format parsing, but it covers ~every palette file on the web.
+  const handlePaletteImport = (file) => {
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target.result; const hexMatches = text.match(/#[0-9A-Fa-f]{6}/g);
-      if (hexMatches && hexMatches.length > 0) {
+      const text = event.target.result;
+      // Match both #RRGGBB and bare RRGGBB (the Lospec API returns the latter).
+      const hexMatches = (text.match(/#?[0-9A-Fa-f]{6}\b/g) || []).map(h => h.startsWith('#') ? h : '#' + h);
+      if (hexMatches.length > 0) {
           const newPalette = hexMatches.map((hex, i) => {
               const [r, g, b] = hexToRgb(hex);
               return { r, g, b, displayR: r, displayG: g, displayB: b, offsetX: 0, offsetY: 0, locked: true, isNew: true, id: generateId(), impactIndex: i };
           });
           const capped = newPalette.slice(0, 256); setActivePalette(capped); setSettings(s => ({ ...s, paletteSize: capped.length })); setRecalcTrigger(n => n + 1);
-      } else { alert("No valid hex codes found."); }
+      } else { alert("No valid hex codes found in file."); }
     };
-    reader.readAsText(file); e.target.value = null;
+    reader.readAsText(file);
+  };
+
+  // True if the dropped/uploaded filename looks like a palette rather than an image/video.
+  const PALETTE_EXTENSIONS = ['.hex', '.gpl', '.pal', '.json', '.txt', '.aco', '.ase'];
+  const isPaletteFile = (file) => {
+    if (!file?.name) return false;
+    const name = file.name.toLowerCase();
+    return PALETTE_EXTENSIONS.some(ext => name.endsWith(ext));
   };
 
   const handlePaletteExport = (format) => {
@@ -2249,7 +2450,17 @@ export default function App() {
           </div>
       )}
 
-      <div className={styles.panel}>
+      <div className={styles.panel}
+           onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+           onDrop={e => {
+               e.preventDefault();
+               const file = e.dataTransfer.files?.[0];
+               if (!file) return;
+               // Inside the palette panel, palette files always import as palettes; image files
+               // import as images (mirroring the canvas drop behaviour).
+               if (isPaletteFile(file)) handlePaletteImport(file);
+               else processImageFile(file);
+           }}>
           <div className={styles.panelHeader}>
               <div className="flex items-center gap-2 min-w-0">
                   <Layers className="w-5 h-5 text-neutral-500 flex-shrink-0" />
@@ -2327,7 +2538,13 @@ export default function App() {
           </div>
       </div>
 
-      <main className={`flex-1 relative overflow-hidden flex flex-col h-full ${isDark ? 'bg-black' : 'bg-neutral-100'}`} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files?.[0]) processImageFile(e.dataTransfer.files[0]); }}>
+      <main className={`flex-1 relative overflow-hidden flex flex-col h-full ${isDark ? 'bg-black' : 'bg-neutral-100'}`} onDragOver={e => e.preventDefault()} onDrop={e => {
+          e.preventDefault();
+          const file = e.dataTransfer.files?.[0];
+          if (!file) return;
+          if (isPaletteFile(file)) handlePaletteImport(file);
+          else processImageFile(file);
+      }}>
         {!imageSrc && <div onClick={() => document.getElementById('main-upload')?.click()} className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400 cursor-pointer"><ImageIcon className="w-10 h-10 mb-4 opacity-20" /><p>Open/drag an image/video/GIF</p></div>}
         
         {imageSrc && (
