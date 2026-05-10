@@ -200,13 +200,89 @@ const PRESET_PALETTES = {
   }
 };
 
+// Error-diffusion kernels. Historical context:
+//   The pseudo-random-noise dithering idea originates with Roberts, L. G., "Picture Coding Using
+//   Pseudo-Random Noise", IRE Trans. Information Theory IT-8(2):145-154, 1962 (his 1961 MIT MS thesis).
+//   The 2-D error-diffusion paradigm was introduced concurrently in 1976 by Floyd & Steinberg
+//   (this file) and by Jarvis, Judice & Ninke ("A survey of techniques for the display of continuous
+//   tone pictures on bilevel displays", Computer Graphics and Image Processing 5:13-40, 1976,
+//   DOI: 10.1016/S0146-664X(76)80003-2). JJN is the immediate ancestor of Stucki and Burkes.
 const ERROR_KERNELS = {
-    'floyd': [ { x: 1, y: 0, f: 7/16 }, { x: -1, y: 1, f: 3/16 }, { x: 0, y: 1, f: 5/16 }, { x: 1, y: 1, f: 1/16 } ],
-    'atkinson': [ { x: 1, y: 0, f: 1/8 }, { x: 2, y: 0, f: 1/8 }, { x: -1, y: 1, f: 1/8 }, { x: 0, y: 1, f: 1/8 }, { x: 1, y: 1, f: 1/8 }, { x: 0, y: 2, f: 1/8 } ],
-    'sierra': [ {x:1,y:0,f:5/32}, {x:2,y:0,f:3/32}, {x:-2,y:1,f:2/32}, {x:-1,y:1,f:4/32}, {x:0,y:1,f:5/32}, {x:1,y:1,f:4/32}, {x:2,y:1,f:2/32}, {x:-1,y:2,f:2/32}, {x:0,y:2,f:3/32}, {x:1,y:2,f:2/32} ],
+    // Floyd, R.W. & Steinberg, L., "An adaptive algorithm for spatial grey scale",
+    // Proc. Society for Information Display 17(2):75-77, 1976. Coefficients sum to 1.
+    'floyd':       [ {x:1,y:0,f:7/16}, {x:-1,y:1,f:3/16}, {x:0,y:1,f:5/16}, {x:1,y:1,f:1/16} ],
+    // Atkinson, B. (developed 1983, shipped 1984). Used in Apple QuickDraw / MacPaint / HyperCard.
+    // No formal publication. The 6 cells deliberately sum to 6/8 = 3/4 -- the missing 1/4 is the
+    // signature attenuation that keeps highlights and shadows pure on a 1-bit display.
+    'atkinson':    [ {x:1,y:0,f:1/8}, {x:2,y:0,f:1/8}, {x:-1,y:1,f:1/8}, {x:0,y:1,f:1/8}, {x:1,y:1,f:1/8}, {x:0,y:2,f:1/8} ],
+    // Sierra, F., posted to the CompuServe Computer Art Forum, 1989. No formal publication;
+    // catalogued by Crocker/Boulay/Morra in DHALF.TXT (1991) and by Helland (2012).
+    'sierra':      [ {x:1,y:0,f:5/32},{x:2,y:0,f:3/32},{x:-2,y:1,f:2/32},{x:-1,y:1,f:4/32},{x:0,y:1,f:5/32},{x:1,y:1,f:4/32},{x:2,y:1,f:2/32},{x:-1,y:2,f:2/32},{x:0,y:2,f:3/32},{x:1,y:2,f:2/32} ],
+    // Sierra, F. ("Sierra-2-4A" / "Filter Lite"), 1990. Same source family.
     'sierra-lite': [ {x:1,y:0,f:2/4}, {x:-1,y:1,f:1/4}, {x:0,y:1,f:1/4} ],
-    'stucki': [ {x:1,y:0,f:8/42},{x:2,y:0,f:4/42},{x:-2,y:1,f:2/42},{x:-1,y:1,f:4/42},{x:0,y:1,f:8/42},{x:1,y:1,f:4/42},{x:2,y:1,f:2/42},{x:-2,y:2,f:1/42},{x:-1,y:2,f:2/42},{x:0,y:2,f:4/42},{x:1,y:2,f:2/42},{x:2,y:2,f:1/42} ],
-    'burkes': [ {x:1,y:0,f:8/32},{x:2,y:0,f:4/32},{x:-2,y:1,f:2/32},{x:-1,y:1,f:4/32},{x:0,y:1,f:8/32},{x:1,y:1,f:4/32},{x:2,y:1,f:2/32} ]
+    // Stucki, P., "MECCA -- A multiple-error correcting computation algorithm for bilevel image
+    // hardcopy reproduction", IBM Research Report RZ 1060, IBM Zurich, 1981. Refines JJN with
+    // power-of-two coefficients (the divisor 42 still requires real division, but every weight
+    // reduces to a single bit-shift once 1/42 is computed).
+    'stucki':      [ {x:1,y:0,f:8/42},{x:2,y:0,f:4/42},{x:-2,y:1,f:2/42},{x:-1,y:1,f:4/42},{x:0,y:1,f:8/42},{x:1,y:1,f:4/42},{x:2,y:1,f:2/42},{x:-2,y:2,f:1/42},{x:-1,y:2,f:2/42},{x:0,y:2,f:4/42},{x:1,y:2,f:2/42},{x:2,y:2,f:1/42} ],
+    // Burkes, D., "LaserWave" newsletter, 1988. Stucki with the bottom row removed; the resulting
+    // divisor 32 = 2^5 lets the entire kernel reduce to bit-shifts.
+    'burkes':      [ {x:1,y:0,f:8/32},{x:2,y:0,f:4/32},{x:-2,y:1,f:2/32},{x:-1,y:1,f:4/32},{x:0,y:1,f:8/32},{x:1,y:1,f:4/32},{x:2,y:1,f:2/32} ]
+};
+
+// Ostromoukhov, V., "A simple and efficient error-diffusion algorithm",
+// Proc. SIGGRAPH 2001, pp. 567-572. DOI: 10.1145/383259.383326.
+//
+// Three-cell kernel at offsets (x=+1,y=0), (x=-1,y=+1), (x=0,y=+1). For every input
+// intensity level 0..255, the three integer weights and their sum are looked up in a
+// precomputed table. The table below is a verbatim transcription of Appendix I of the
+// 2001 paper (entries 0..127); entries 128..255 are obtained by symmetry, D[i] = D[255-i].
+//
+// IMPORTANT: This algorithm is calibrated for a serpentine raster (alternating L-to-R
+// and R-to-L). The renderer enforces serpentine traversal whenever this method is selected.
+const OSTROMOUKHOV_TABLE = (() => {
+    // Half-range [0..127] from Ostromoukhov 2001, Appendix I. Triplets are (A_R, A_BL, A_B):
+    //   d_R  = A_R  / (A_R + A_BL + A_B)   -- east  neighbour, offset (+1,  0)
+    //   d_BL = A_BL / (A_R + A_BL + A_B)   -- below-left,      offset (-1, +1)
+    //   d_B  = A_B  / (A_R + A_BL + A_B)   -- below,           offset ( 0, +1)
+    const half = [
+        [13,0,5],[13,0,5],[21,0,10],[7,0,4],[8,0,5],[47,3,28],[23,3,13],[15,3,8],
+        [22,6,11],[43,15,20],[7,3,3],[501,224,211],[249,116,103],[165,80,67],[123,62,49],[489,256,191],
+        [81,44,31],[483,272,181],[60,35,22],[53,32,19],[237,148,83],[471,304,161],[3,2,1],[481,314,185],
+        [354,226,155],[1389,866,685],[227,138,125],[267,158,163],[327,188,220],[61,34,45],[627,338,505],[1227,638,1075],
+        [20,10,19],[1937,1000,1767],[977,520,855],[657,360,551],[71,40,57],[2005,1160,1539],[337,200,247],[2039,1240,1425],
+        [257,160,171],[691,440,437],[1045,680,627],[301,200,171],[177,120,95],[2141,1480,1083],[1079,760,513],[725,520,323],
+        [137,100,57],[2209,1640,855],[53,40,19],[2243,1720,741],[565,440,171],[759,600,209],[1147,920,285],[2311,1880,513],
+        [97,80,19],[335,280,57],[1181,1000,171],[793,680,95],[599,520,57],[2413,2120,171],[405,360,19],[2447,2200,57],
+        [11,10,0],[158,151,3],[178,179,7],[1030,1091,63],[248,277,21],[318,375,35],[458,571,63],[878,1159,147],
+        [5,7,1],[172,181,37],[97,76,22],[72,41,17],[119,47,29],[4,1,1],[4,1,1],[4,1,1],
+        [4,1,1],[4,1,1],[4,1,1],[4,1,1],[4,1,1],[4,1,1],[65,18,17],[95,29,26],
+        [185,62,53],[30,11,9],[35,14,11],[85,37,28],[55,26,19],[80,41,29],[155,86,59],[5,3,2],
+        [5,3,2],[5,3,2],[5,3,2],[5,3,2],[5,3,2],[5,3,2],[5,3,2],[5,3,2],
+        [5,3,2],[5,3,2],[5,3,2],[5,3,2],[305,176,119],[155,86,59],[105,56,39],[80,41,29],
+        [65,32,23],[55,26,19],[335,152,113],[85,37,28],[115,48,37],[35,14,11],[355,136,109],[30,11,9],
+        [365,128,107],[185,62,53],[25,8,7],[95,29,26],[385,112,103],[65,18,17],[395,104,101],[4,1,1],
+    ];
+    // Pre-normalize into 256 rows of {f_R, f_BL, f_B} (floats summing to 1) for fast lookup.
+    const tbl = new Array(256);
+    for (let i = 0; i < 256; i++) {
+        const [a, b, c] = i < 128 ? half[i] : half[255 - i];
+        const m = a + b + c;
+        tbl[i] = { f_R: a / m, f_BL: b / m, f_B: c / m };
+    }
+    return tbl;
+})();
+
+// Three-cell Ostromoukhov kernel for a given input intensity (0..255).
+// The renderer iterates this exactly like the static kernels in ERROR_KERNELS.
+const getOstromoukhovKernel = (intensity) => {
+    const idx = clamp(Math.round(intensity), 0, 255);
+    const w = OSTROMOUKHOV_TABLE[idx];
+    return [
+        { x:  1, y: 0, f: w.f_R  },   // east
+        { x: -1, y: 1, f: w.f_BL },   // below-left
+        { x:  0, y: 1, f: w.f_B  },   // below
+    ];
 };
 
 // ==========================================
@@ -241,14 +317,116 @@ const generateHalftoneMatrix = (n) => {
 const BAYER_MAPS = { 2: generateBayerMatrix(2), 4: generateBayerMatrix(4), 8: generateBayerMatrix(8), 16: generateBayerMatrix(16), 32: generateBayerMatrix(32) };
 const HALFTONE_MAPS = { 2: generateHalftoneMatrix(2), 4: generateHalftoneMatrix(4), 8: generateHalftoneMatrix(8), 16: generateHalftoneMatrix(16), 32: generateHalftoneMatrix(32) };
 
-const getOstromoukhovKernel = (intensity) => {
-    const t = clamp(intensity / 255.0, 0, 1);
-    const d1 = 13 + t * (1 - t) * 4 * (4 - 13);
-    const d2 = 5 + t * (1 - t) * 4 * (4 - 5);
-    const d3 = 5 + t * (1 - t) * 4 * (15 - 5);
-    const d4 = 9; 
-    const sum = d1 + d2 + d3 + d4;
-    return [ {x:1, y:0, f: d1/sum}, {x:-1, y:1, f: d2/sum}, {x:0, y:1, f: d3/sum}, {x:1, y:1, f: d4/sum} ];
+// Blue-noise threshold mask via the void-and-cluster algorithm.
+//   Ulichney, R. A., "The void-and-cluster method for dither array generation",
+//   Proc. SPIE 1913, Human Vision, Visual Processing, and Digital Display IV,
+//   pp. 332-343, 1993. DOI: 10.1117/12.152707.
+//
+// The mask returned has the same SHAPE as the Bayer matrices in this file (a
+// 2-D array of integers in [0, N*N - 1]) so it drops into the existing pattern
+// dispatcher without further changes. Generation is deferred to the first call;
+// a single 32x32 mask (~50ms in JS) is generated once and cached.
+const generateVoidAndClusterMask = (size) => {
+    const N = size * size;
+    const sigma = 1.9;                     // Ulichney's recommended Gaussian sigma.
+    const sigmaSq2 = 2 * sigma * sigma;
+    const filterRadius = Math.ceil(3 * sigma);
+
+    const energy = new Float32Array(N);    // Gaussian-filtered density of "1" pixels.
+    const pattern = new Uint8Array(N);     // Working binary pattern, 1 = on.
+    const ranks = new Int32Array(N);       // Final rank assigned to each pixel.
+
+    const wrap = (a, b) => ((a % b) + b) % b;
+    const idx = (x, y) => wrap(y, size) * size + wrap(x, size);
+
+    // Toroidal Gaussian splat: add (sign=+1) or remove (sign=-1) one point's contribution.
+    const splat = (px, py, sign) => {
+        for (let dy = -filterRadius; dy <= filterRadius; dy++) {
+            for (let dx = -filterRadius; dx <= filterRadius; dx++) {
+                energy[idx(px + dx, py + dy)] += sign * Math.exp(-(dx * dx + dy * dy) / sigmaSq2);
+            }
+        }
+    };
+
+    // Find tightest cluster (highest-energy ON pixel).
+    const findTightestCluster = () => {
+        let best = -1, bestE = -Infinity;
+        for (let i = 0; i < N; i++) if (pattern[i] && energy[i] > bestE) { bestE = energy[i]; best = i; }
+        return best;
+    };
+    // Find largest void (lowest-energy OFF pixel).
+    const findLargestVoid = () => {
+        let best = -1, bestE = Infinity;
+        for (let i = 0; i < N; i++) if (!pattern[i] && energy[i] < bestE) { bestE = energy[i]; best = i; }
+        return best;
+    };
+
+    // Step 0: deterministic seed pattern (~10% density) using a small LCG so the mask is reproducible.
+    let lcg = 0xBEEF1234 >>> 0;
+    const rand = () => { lcg = (Math.imul(lcg, 1664525) + 1013904223) >>> 0; return lcg / 0x1_0000_0000; };
+    const initialOnes = Math.max(1, Math.floor(N / 10));
+    let placed = 0;
+    while (placed < initialOnes) {
+        const i = Math.floor(rand() * N);
+        if (!pattern[i]) { pattern[i] = 1; splat(i % size, Math.floor(i / size), +1); placed++; }
+    }
+
+    // Step 1 (initial pattern): swap tightest cluster <-> largest void until the swap becomes a no-op.
+    while (true) {
+        const tight = findTightestCluster();
+        pattern[tight] = 0; splat(tight % size, Math.floor(tight / size), -1);
+        const voidI = findLargestVoid();
+        if (voidI === tight) {
+            pattern[tight] = 1; splat(tight % size, Math.floor(tight / size), +1);
+            break;
+        }
+        pattern[voidI] = 1; splat(voidI % size, Math.floor(voidI / size), +1);
+    }
+
+    // Snapshot the relaxed prototype before phases mutate `pattern`.
+    const prototype = new Uint8Array(pattern);
+
+    // Phase I: rank ones, ones-1, ..., 0 by repeatedly removing the tightest cluster.
+    for (let rank = placed - 1; rank >= 0; rank--) {
+        const tight = findTightestCluster();
+        ranks[tight] = rank;
+        pattern[tight] = 0;
+        splat(tight % size, Math.floor(tight / size), -1);
+    }
+
+    // Phase II: restore the prototype and rank ones, ones+1, ..., N/2-1 by filling largest voids.
+    pattern.set(prototype); energy.fill(0);
+    for (let i = 0; i < N; i++) if (pattern[i]) splat(i % size, Math.floor(i / size), +1);
+    const half = Math.floor(N / 2);
+    for (let rank = placed; rank < half; rank++) {
+        const voidI = findLargestVoid();
+        ranks[voidI] = rank;
+        pattern[voidI] = 1;
+        splat(voidI % size, Math.floor(voidI / size), +1);
+    }
+
+    // Phase III: invert the pattern; "tightest cluster of 0s" = "largest void of 1s" in the dual.
+    for (let i = 0; i < N; i++) pattern[i] = 1 - pattern[i];
+    energy.fill(0);
+    for (let i = 0; i < N; i++) if (pattern[i]) splat(i % size, Math.floor(i / size), +1);
+    for (let rank = half; rank < N; rank++) {
+        const tight = findTightestCluster();
+        ranks[tight] = rank;
+        pattern[tight] = 0;
+        splat(tight % size, Math.floor(tight / size), -1);
+    }
+
+    // Reshape flat ranks into the 2-D matrix shape used elsewhere.
+    const matrix = Array(size).fill().map(() => Array(size).fill(0));
+    for (let i = 0; i < N; i++) matrix[Math.floor(i / size)][i % size] = ranks[i];
+    return matrix;
+};
+
+// Lazy cache: blue-noise generation is ~50ms for 32x32, so we only build it on first use.
+const BLUE_NOISE_MAPS = {};
+const getBlueNoiseMap = (size) => {
+    if (!BLUE_NOISE_MAPS[size]) BLUE_NOISE_MAPS[size] = generateVoidAndClusterMask(size);
+    return BLUE_NOISE_MAPS[size];
 };
 
 const generateHilbertCurve = (width, height) => {
@@ -634,10 +812,20 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
     } else if (ditherCategory === 'flow') {
         const safeRiemersmaHistory = riemersmaHistory || 16;
         if (ditherSubMethod === 'riemersma') {
+            // Riemersma, T., "A Balanced Dithering Technique", C/C++ Users Journal, December 1998.
+            // (Also: https://www.compuphase.com/riemer.htm) Weights form a geometric series along
+            // the queue: w_i = b^i with b = r^(1/(Q-1)), where r is the newest:oldest weight ratio
+            // and Q is the queue length. Riemersma's recommended defaults are r = 16 and Q >= 16.
+            // The previous code used `Math.exp(-i / (Q/4))`, which is also exponential but with a
+            // hard-coded time constant unrelated to r. Fixed.
             const curve = generateHilbertCurve(width, height);
             const history = [];
-            const Hweights = Array.from({length: safeRiemersmaHistory}, (_, i) => Math.exp(-i / (safeRiemersmaHistory / 4)));
-            const sumWeights = Hweights.reduce((a,b)=>a+b, 0);
+            const Q = safeRiemersmaHistory;
+            const r = settings.riemersmaRatio || 16;
+            const b = Math.pow(r, 1 / Math.max(1, Q - 1));
+            // history.unshift puts newest at index 0, so weights[0] (newest) = r, weights[Q-1] (oldest) = 1.
+            const Hweights = Array.from({length: Q}, (_, i) => Math.pow(b, Q - 1 - i));
+            const sumWeights = Hweights.reduce((a, w) => a + w, 0);
 
             for (const {x, y} of curve) {
                 const idx = (y * width + x) * 4;
@@ -669,8 +857,11 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                 if (history.length > safeRiemersmaHistory) history.pop();
             }
         } else {
+            // Ostromoukhov 2001 was calibrated for serpentine traversal -- enforce it for that
+            // method regardless of the user's serpentine toggle.
+            const useSerpentine = serpentine || ditherSubMethod === 'ostromoukhov';
             for (let y = 0; y < height; y++) {
-                const isRev = serpentine && (y % 2 === 1);
+                const isRev = useSerpentine && (y % 2 === 1);
                 const startX = isRev ? width - 1 : 0; const endX = isRev ? -1 : width; const stepX = isRev ? -1 : 1;
                 for (let x = startX; x !== endX; x += stepX) {
                     const idx = (y * width + x) * 4; 
@@ -697,7 +888,12 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                         const err1 = (safe1 - nearest.transformed[1]) * (dithering || 0.15);
                         const err2 = (safe2 - nearest.transformed[2]) * (dithering || 0.15);
                         
-                        const kernel = ditherSubMethod === 'ostromoukhov' ? getOstromoukhovKernel((cR+cG+cB)/3) : (ERROR_KERNELS[ditherSubMethod] || ERROR_KERNELS.floyd);
+                        // Index Ostromoukhov's LUT by perceptual luminance (BT.709). The original
+                        // paper is monochrome; for color the indexing channel is a design choice,
+                        // and BT.709 luma matches the modern convention (see ITU-R BT.709-6).
+                        const kernel = ditherSubMethod === 'ostromoukhov'
+                            ? getOstromoukhovKernel(0.2126*cR + 0.7152*cG + 0.0722*cB)
+                            : (ERROR_KERNELS[ditherSubMethod] || ERROR_KERNELS.floyd);
                         
                         kernel.forEach(k => {
                             const dx = isRev ? -k.x : k.x, dy = k.y; 
@@ -711,8 +907,14 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
             }
         }
     } else if (ditherCategory === 'pattern') {
-        const reqSize = ditherSubMethod === 'blue-noise' ? 8 : (parseInt(bayerSize) || 8);
-        const map = ditherSubMethod === 'halftone' ? (HALFTONE_MAPS[reqSize] || HALFTONE_MAPS[8]) : (BAYER_MAPS[reqSize] || BAYER_MAPS[8]);
+        // Choose the threshold matrix. Blue-noise mode uses a real void-and-cluster mask
+        // (Ulichney 1993); halftone mode uses the radial spiral; otherwise Bayer 1973.
+        // Previously this branch fell back to an 8x8 Bayer matrix when 'blue-noise' was
+        // selected -- which is precisely NOT blue noise. Fixed.
+        const reqSize = ditherSubMethod === 'blue-noise' ? 32 : (parseInt(bayerSize) || 8);
+        const map = ditherSubMethod === 'blue-noise' ? getBlueNoiseMap(reqSize)
+                  : ditherSubMethod === 'halftone'   ? (HALFTONE_MAPS[reqSize] || HALFTONE_MAPS[8])
+                  :                                    (BAYER_MAPS[reqSize]    || BAYER_MAPS[8]);
         const mapSize = map.length || 8; 
         const spaceScale = SPACE_SCALES[colorSpace] || 1;
 
@@ -759,19 +961,38 @@ const renderDitheredImage = (canvas, sourceData, palette, settings) => {
                 const bayerVal = (map[y % mapSize]?.[x % mapSize] || 0) / (mapSize * mapSize);
 
                 if (ditherSubMethod === 'knoll') {
+                    // Knoll, T., "Pattern dithering", US Patent 6,606,166 B1 (Adobe, 2003; expired 2019).
+                    // Step 1: generate N candidate colours by accumulating residual error.
                     let g0 = v0, g1 = v1, g2 = v2;
                     const candidates = [];
                     for (let n = 0; n < validNCandidates; n++) {
                         const nearest = getNearestColor([g0, g1, g2]);
+                        if (!nearest) break;
                         candidates.push(nearest);
-                        if (nearest) {
-                            g0 += (v0 - nearest.transformed[0]); 
-                            g1 += (v1 - nearest.transformed[1]); 
-                            g2 += (v2 - nearest.transformed[2]);
-                        }
+                        g0 += (v0 - nearest.transformed[0]);
+                        g1 += (v1 - nearest.transformed[1]);
+                        g2 += (v2 - nearest.transformed[2]);
                     }
-                    const randVal = prng(x, y, settings.ditherSeed);
-                    const chosenIndex = clamp(Math.floor(randVal * validNCandidates), 0, validNCandidates - 1);
+                    // Step 2: sort by luminance (Claim 7) so the chosen index maps monotonically
+                    // to brightness. BT.709 luma is computed on the display RGB, not the working
+                    // colour space, since "luminance" in the patent means the perceived brightness.
+                    candidates.sort((a, b) =>
+                        (0.2126*a.displayR + 0.7152*a.displayG + 0.0722*a.displayB) -
+                        (0.2126*b.displayR + 0.7152*b.displayG + 0.0722*b.displayB)
+                    );
+                    // Step 3: select one candidate via the dither-ordering function. The patent
+                    // claims THREE valid choices: Bayer / blue-noise threshold (Claim 11), random
+                    // noise table (Claims 9-10), or unbiased random (Claim 12). We expose the
+                    // first two: ditherSeed > 0 routes to the legacy PRNG; ditherSeed == 0 (the
+                    // default) uses the Bayer threshold from the surrounding 'geometric' branch,
+                    // which gives noticeably smoother gradients.
+                    const N = candidates.length;
+                    let chosenIndex;
+                    if (settings.ditherSeed && settings.ditherSeed > 0) {
+                        chosenIndex = clamp(Math.floor(prng(x, y, settings.ditherSeed) * N), 0, N - 1);
+                    } else {
+                        chosenIndex = clamp(Math.floor(bayerVal * N), 0, N - 1);
+                    }
                     const chosen = candidates[chosenIndex] || candidates[0];
                     if (chosen) { pixels[idx] = chosen.displayR; pixels[idx+1] = chosen.displayG; pixels[idx+2] = chosen.displayB; }
                 } 
@@ -1073,13 +1294,16 @@ const DitheringPanel = ({ styles, isDark, settings, updateSetting, paletteData, 
                     "No Dither": [ {value: 'best-match', label: 'Best Match'}, {value: 'linear-projection', label: 'Linear Projection'}, {value: 'paper-beer-lambert', label: 'Paper (Beer-Lambert)'}, {value: 'paper-mixbox', label: 'Paper (Mixbox)'} ],
                     "Ordered": [ {value: 'bayer', label: 'Bayer (Dispersed)'}, {value: 'halftone', label: 'Halftone (Clustered)'}, {value: 'blue-noise', label: 'Blue Noise'} ],
                     "Diffusion": [ {value: 'floyd', label: 'Floyd-Steinberg'}, {value: 'atkinson', label: 'Atkinson'}, {value: 'sierra', label: 'Sierra (3-row)'}, {value: 'sierra-lite', label: 'Sierra Lite'}, {value: 'stucki', label: 'Stucki'}, {value: 'burkes', label: 'Burkes'}, {value: 'ostromoukhov', label: 'Ostromoukhov'}, {value: 'riemersma', label: 'Riemersma'} ],
-                    "Geometric": [ {value: 'knoll', label: 'Thomas Knoll'}, {value: 'n-closest', label: "N-Closest (Shepard's)"}, {value: 'n-convex', label: 'N-Convex'}, {value: 'fw-dither', label: 'Linear Projection (NNLS)'} ]
+                    "Geometric": [ {value: 'knoll', label: 'Knoll Pattern (Adobe)'}, {value: 'n-closest', label: 'IDW Candidates'}, {value: 'n-convex', label: 'N-Convex'}, {value: 'fw-dither', label: 'Frank-Wolfe Threshold'} ]
                 }} />
                 {settings.ditherCategory === 'flow' && settings.ditherSubMethod !== 'riemersma' && <IconButton styles={styles} icon={WrapText} onClick={() => updateSetting('serpentine', !settings.serpentine)} title="Serpentine Scanning" className={`border ${settings.serpentine ? (isDark ? 'bg-neutral-800 border-neutral-400' : 'bg-neutral-200 border-neutral-400') : 'border-neutral-300 dark:border-neutral-700'}`} />}
                 {settings.ditherCategory === 'pattern' && settings.ditherSubMethod === 'halftone' && paletteData.displayed.some(c => c.locked) && <IconButton styles={styles} icon={Dices} onClick={() => onPaletteAction.randomizeOffsets()} title="Randomize All Offsets" className={`border border-neutral-300 dark:border-neutral-700`} />}
                 {settings.ditherCategory === 'geometric' && settings.ditherSubMethod === 'knoll' && <IconButton styles={styles} icon={Dices} onClick={() => updateSetting('ditherSeed', (settings.ditherSeed || 0) + 1)} title="Reseed Pattern" className="border border-neutral-300 dark:border-neutral-700" />}
             </div>
-            {settings.ditherCategory === 'flow' && settings.ditherSubMethod === 'riemersma' && <div><div className="flex justify-between text-xs font-bold text-neutral-400 mb-1.5"><span>CURVE HISTORY (L)</span><span>{settings.riemersmaHistory}</span></div><RangeSlider styles={styles} min={4} max={64} step={4} value={settings.riemersmaHistory} onChange={(e) => updateSetting('riemersmaHistory', Number(e.target.value))} /></div>}
+            {settings.ditherCategory === 'flow' && settings.ditherSubMethod === 'riemersma' && <>
+                <div><div className="flex justify-between text-xs font-bold text-neutral-400 mb-1.5"><span>CURVE HISTORY (Q)</span><span>{settings.riemersmaHistory}</span></div><RangeSlider styles={styles} min={4} max={64} step={4} value={settings.riemersmaHistory} onChange={(e) => updateSetting('riemersmaHistory', Number(e.target.value))} /></div>
+                <div><div className="flex justify-between text-xs font-bold text-neutral-400 mb-1.5"><span>WEIGHT RATIO (r)</span><span>{settings.riemersmaRatio || 16}</span></div><RangeSlider styles={styles} min={2} max={64} step={2} value={settings.riemersmaRatio || 16} onChange={(e) => updateSetting('riemersmaRatio', Number(e.target.value))} /></div>
+            </>}
             {settings.ditherCategory === 'pattern' && settings.ditherSubMethod !== 'blue-noise' && <div className={styles.segmentGroup}>{[2, 4, 8, 16, 32].map(s => (<button key={s} onClick={() => updateSetting('bayerSize', s)} className={styles.segmentButton(settings.bayerSize === s)}>{s}x</button>))}</div>}
             {settings.ditherCategory === 'geometric' && settings.ditherSubMethod !== 'fw-dither' && <div><div className="flex justify-between text-xs font-bold text-neutral-400 mb-1.5"><span>CANDIDATES (N)</span><span>{settings.nCandidates}</span></div><RangeSlider styles={styles} min={2} max={16} step={1} value={settings.nCandidates} onChange={(e) => updateSetting('nCandidates', Number(e.target.value))} /></div>}
             {settings.ditherCategory === 'geometric' && (settings.ditherSubMethod === 'n-closest' || settings.ditherSubMethod === 'n-convex') && <div><div className="flex justify-between text-xs font-bold text-neutral-400 mb-1.5"><span>DISTANCE EXPONENT (s)</span><span>{settings.distanceExponent}</span></div><RangeSlider styles={styles} min={0.5} max={5} step={0.5} value={settings.distanceExponent} onChange={(e) => updateSetting('distanceExponent', Number(e.target.value))} /></div>}
@@ -1213,7 +1437,7 @@ export default function App() {
       colorSpace: 'oklab', matchMethod: 'euclidean', manualWeights: { r: 0.21, g: 0.72, b: 0.07 },
       paletteSize: 4, contrastAnchoring: false, genSeed: 0, sortMode: 'impact',
       ditherCategory: 'pattern', ditherSubMethod: 'bayer', dithering: 0.15, bayerSize: 2, 
-      serpentine: false, nCandidates: 4, distanceExponent: 2.0, riemersmaHistory: 16, ditherSeed: 0,
+      serpentine: false, nCandidates: 4, distanceExponent: 2.0, riemersmaHistory: 16, riemersmaRatio: 16, ditherSeed: 0,
       videoFps: 30, originalFps: null
   });
 
