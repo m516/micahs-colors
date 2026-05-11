@@ -10,6 +10,7 @@
 
 @theme {
   --font-sans: "VT323", monospace;
+  --font-mono: "VT323", monospace;
 }
 
 @layer base {
