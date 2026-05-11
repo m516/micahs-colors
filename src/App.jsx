@@ -2403,7 +2403,7 @@ export default function App() {
           if (cur !== snap) {
               applyZoomCentered(snap, clientX, clientY);
           }
-      }, 200);
+      }, 100);
   }, [applyZoomCentered]);
 
   useEffect(() => {
