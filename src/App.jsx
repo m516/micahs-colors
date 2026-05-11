@@ -31,19 +31,17 @@ const ZOOM_SNAPS = (() => {
     return snaps;
 })();
 
-// Soft-snap: if `z` is within `tolerance` (relative) of a snap point, return that point;
-// otherwise return `z` unchanged. The forgiveness lets gradual scroll-wheel zoom "stick"
-// near clean values without trapping the user — fast scrolls pass straight through.
-const softSnapZoom = (z, tolerance = 0.04) => {
-    let best = z, bestDist = Infinity;
+// Find the snap point closest to z (absolute distance). Used by post-idle snap.
+const nearestZoomSnap = (z) => {
+    let best = ZOOM_SNAPS[0], bestDist = Infinity;
     for (const s of ZOOM_SNAPS) {
-        const d = Math.abs(z - s) / s;
-        if (d < tolerance && d < bestDist) { bestDist = d; best = s; }
+        const d = Math.abs(z - s);
+        if (d < bestDist) { bestDist = d; best = s; }
     }
     return best;
 };
 
-// Step to the next snap point in a direction. Used by the +/- zoom buttons.
+// Step to the next snap point in a direction. Used by the +/- zoom buttons for discrete stepping.
 const nextZoomSnap = (current, direction) => {
     const eps = 1e-4;
     if (direction > 0) return ZOOM_SNAPS.find(s => s > current + eps) ?? ZOOM_SNAPS[ZOOM_SNAPS.length - 1];
@@ -1909,7 +1907,28 @@ export default function App() {
   const [pickerOpenId, setPickerOpenId] = useState(null); 
   const [pickerPosition, setPickerPosition] = useState({ top: 0, left: 0 }); 
   const [isColorsLinked, setIsColorsLinked] = useState(true); 
+  // viewState = the TARGET (where we want the canvas to be). All user actions update it.
+  // displayViewState = the ACTUAL (what's currently rendered). A RAF loop lerps it toward
+  // the target — log-space for scale, linear for pan — giving a "weighted" feel that
+  // matches the user's reference image-viewer prototype. Drag operations sync display
+  // immediately so drag stays 1:1 with the cursor; everything else animates.
   const [viewState, setViewState] = useState({ scale: 1, x: 0, y: 0, isFit: true });
+  const [displayViewState, setDisplayViewState] = useState({ scale: 1, x: 0, y: 0 });
+  const viewStateRef = useRef(viewState);
+  const displayViewStateRef = useRef(displayViewState);
+  useEffect(() => { viewStateRef.current = viewState; }, [viewState]);
+  useEffect(() => { displayViewStateRef.current = displayViewState; }, [displayViewState]);
+
+  // Set target AND sync display immediately. Use during drag, where the cursor expects
+  // 1:1 image movement with no lerp lag.
+  const setViewStateImmediate = useCallback((updater) => {
+      setViewState(prev => {
+          const next = typeof updater === 'function' ? updater(prev) : updater;
+          setDisplayViewState(d => ({ scale: next.scale, x: next.x, y: next.y }));
+          return next;
+      });
+  }, []);
+
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   // Magic fix for Canvas downscaling noise: Use actual Blob URLs for smooth browser mipmapping
@@ -2102,11 +2121,20 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [sourceVersion, settings.paletteSize, settings.contrastAnchoring, settings.colorSpace, settings.genSeed, settings.sortMode, recalcTrigger, isRenderingVideo]);
 
+  // Adaptive render debounce. The render effect is the heaviest in the app, so we want it
+  // throttled — but rate-of-arrival is the right signal, not a single constant. Rapid
+  // back-to-back changes (video scrubbing, slider drags) use 16ms so the canvas stays
+  // responsive. Isolated changes (a single click — typically followed 50ms later by the
+  // auto-extract that re-orders the palette) use 80ms, longer than the extract delay, so
+  // both state updates collapse into a single render instead of rendering twice.
+  const lastRenderTriggerRef = useRef(0);
+
   useEffect(() => {
     if (!sourceDataRef.current || !canvasRef.current || activePalette.length === 0 || isRenderingVideo) return;
-    // 80ms debounce: longer than the 50ms auto-extract timer above, so cascaded
-    // state updates (e.g. unlock → auto-extract → palette change) collapse into a
-    // single render instead of rendering once before extract and again after.
+    const now = performance.now();
+    const sinceLast = now - lastRenderTriggerRef.current;
+    lastRenderTriggerRef.current = now;
+    const debounceMs = sinceLast < 120 ? 16 : 80;
     const timer = setTimeout(() => {
         renderDitheredImage(canvasRef.current, sourceDataRef.current, activePalette, settings);
         
@@ -2122,7 +2150,7 @@ export default function App() {
                 });
             }
         });
-    }, 80);
+    }, debounceMs);
     return () => clearTimeout(timer);
   }, [activePalette, sourceVersion, settings, isRenderingVideo]);
 
@@ -2317,9 +2345,66 @@ export default function App() {
       if (containerRef.current) {
           const cw = containerRef.current.clientWidth, ch = containerRef.current.clientHeight;
           const scale = Math.min((cw * 0.9) / settings.width, (ch * 0.9) / settings.height, 8);
+          // resetView sets the *target*; the RAF loop will animate display toward it.
           setViewState(v => ({ ...v, scale, x: 0, y: 0 }));
       }
   }, [settings.width, settings.height]);
+
+  // RAF loop: lerps displayViewState toward viewState (the target). Log-space for scale
+  // so zoom changes feel proportional; linear for pan. Returns the same object when
+  // settled, so React skips the re-render and the loop becomes a cheap no-op.
+  // Pattern adapted from user's reference image-viewer prototype.
+  useEffect(() => {
+      let rafId;
+      const animate = () => {
+          setDisplayViewState(prev => {
+              const target = viewStateRef.current;
+              const logD = Math.log(prev.scale), logT = Math.log(target.scale);
+              const newScale = Math.abs(logT - logD) > 0.005 ? Math.exp(logD + (logT - logD) * 0.2) : target.scale;
+              const newX = Math.abs(target.x - prev.x) > 0.5 ? prev.x + (target.x - prev.x) * 0.2 : target.x;
+              const newY = Math.abs(target.y - prev.y) > 0.5 ? prev.y + (target.y - prev.y) * 0.2 : target.y;
+              if (newScale === prev.scale && newX === prev.x && newY === prev.y) return prev;
+              return { scale: newScale, x: newX, y: newY };
+          });
+          rafId = requestAnimationFrame(animate);
+      };
+      rafId = requestAnimationFrame(animate);
+      return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  // Apply a zoom level while keeping the canvas pixel under the cursor stationary.
+  // Default to container-center when no cursor coords are passed (used by toolbar buttons).
+  // Math: cursor offset from container center → canvas-local coordinate (under cursor)
+  // → new pan such that the same local coordinate still lands at the cursor at newScale.
+  const applyZoomCentered = useCallback((newScale, clientX, clientY) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const px = clientX !== undefined ? clientX : rect.left + rect.width / 2;
+      const py = clientY !== undefined ? clientY : rect.top + rect.height / 2;
+      const cx = px - rect.left - rect.width / 2;
+      const cy = py - rect.top - rect.height / 2;
+      const cur = viewStateRef.current;
+      const unscaledX = (cx - cur.x) / cur.scale;
+      const unscaledY = (cy - cur.y) / cur.scale;
+      const newX = cx - unscaledX * newScale;
+      const newY = cy - unscaledY * newScale;
+      setViewState(v => ({ ...v, scale: newScale, x: newX, y: newY, isFit: false }));
+  }, []);
+
+  // Snap to nearest clean zoom level, but only after the wheel has been idle 200ms.
+  // Skips snapping if the user has clearly stopped between snap points (>15% relative
+  // distance) — that's an intentional zoom level, don't override it.
+  const snapTimeoutRef = useRef(null);
+  const triggerSnap = useCallback((clientX, clientY) => {
+      clearTimeout(snapTimeoutRef.current);
+      snapTimeoutRef.current = setTimeout(() => {
+          const cur = viewStateRef.current.scale;
+          const snap = nearestZoomSnap(cur);
+          if (Math.abs(cur - snap) / snap < 0.15 && cur !== snap) {
+              applyZoomCentered(snap, clientX, clientY);
+          }
+      }, 200);
+  }, [applyZoomCentered]);
 
   useEffect(() => {
       if (!viewState.isFit) return;
@@ -2703,23 +2788,57 @@ export default function App() {
   };
 
   const [dragStart, setDragStart] = useState(null); const [isPanning, setIsPanning] = useState(false);
-  const handleMouseDown = (e) => { if (imageSrc) { setIsPanning(true); setDragStart({ x: e.clientX - viewState.x, y: e.clientY - viewState.y }); setViewState(v => ({ ...v, isFit: false })); }};
-  const handleMouseMove = (e) => { if (isPanning) setViewState(v => ({ ...v, x: e.clientX - dragStart.x, y: e.clientY - dragStart.y })); };
+  // Drag uses displayViewState (the actually-visible position) so picking up mid-animation
+  // doesn't cause the image to jump. setViewStateImmediate syncs target+display together
+  // so the drag stays 1:1 with the cursor (no lerp lag).
+  const handleMouseDown = (e) => { if (imageSrc) {
+      const d = displayViewStateRef.current;
+      setIsPanning(true);
+      setDragStart({ x: e.clientX - d.x, y: e.clientY - d.y });
+      setViewStateImmediate(v => ({ ...v, x: d.x, y: d.y, scale: d.scale, isFit: false }));
+  }};
+  const handleMouseMove = (e) => { if (isPanning) setViewStateImmediate(v => ({ ...v, x: e.clientX - dragStart.x, y: e.clientY - dragStart.y })); };
 
   const handleTouchStart = (e) => {
       if (!imageSrc) return;
-      if (e.touches.length === 1) { setIsPanning(true); setDragStart({ x: e.touches[0].clientX - viewState.x, y: e.touches[0].clientY - viewState.y }); setViewState(v => ({ ...v, isFit: false })); } 
-      else if (e.touches.length === 2) { setIsPanning(false); const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; touchState.current.initialDist = Math.hypot(dx, dy); touchState.current.initialScale = viewState.scale; }
+      const d = displayViewStateRef.current;
+      if (e.touches.length === 1) {
+          setIsPanning(true);
+          setDragStart({ x: e.touches[0].clientX - d.x, y: e.touches[0].clientY - d.y });
+          setViewStateImmediate(v => ({ ...v, x: d.x, y: d.y, scale: d.scale, isFit: false }));
+      }
+      else if (e.touches.length === 2) {
+          setIsPanning(false);
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          touchState.current.initialDist = Math.hypot(dx, dy);
+          touchState.current.initialScale = d.scale;
+      }
   };
   const handleTouchMove = (e) => {
       if (!imageSrc) return;
-      if (e.touches.length === 1 && isPanning) setViewState(v => ({ ...v, x: e.touches[0].clientX - dragStart.x, y: e.touches[0].clientY - dragStart.y }));
-      else if (e.touches.length === 2) { const dx = e.touches[0].clientX - e.touches[1].clientX; const dy = e.touches[0].clientY - e.touches[1].clientY; const dist = Math.hypot(dx, dy); if (touchState.current.initialDist > 0) { const newScale = clamp(touchState.current.initialScale * (dist / touchState.current.initialDist), 0.015625, 64); setViewState(v => ({ ...v, scale: newScale, isFit: false })); } }
+      if (e.touches.length === 1 && isPanning) setViewStateImmediate(v => ({ ...v, x: e.touches[0].clientX - dragStart.x, y: e.touches[0].clientY - dragStart.y }));
+      else if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const dist = Math.hypot(dx, dy);
+          if (touchState.current.initialDist > 0) {
+              const newScale = clamp(touchState.current.initialScale * (dist / touchState.current.initialDist), 0.015625, 64);
+              const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+              const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+              applyZoomCentered(newScale, cx, cy);
+              triggerSnap(cx, cy);
+          }
+      }
   };
   const handleTouchEnd = (e) => {
       if (e.touches.length < 2) touchState.current.initialDist = 0;
       if (e.touches.length === 0) setIsPanning(false);
-      else if (e.touches.length === 1) { setDragStart({ x: e.touches[0].clientX - viewState.x, y: e.touches[0].clientY - viewState.y }); setIsPanning(true); }
+      else if (e.touches.length === 1) {
+          const d = displayViewStateRef.current;
+          setDragStart({ x: e.touches[0].clientX - d.x, y: e.touches[0].clientY - d.y });
+          setIsPanning(true);
+      }
   };
 
   return (
@@ -2842,13 +2961,13 @@ export default function App() {
                 onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={() => setIsPanning(false)} onMouseLeave={() => setIsPanning(false)}
                 onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
                 onWheel={e => {
-                    const delta = -e.deltaY * 0.001;
-                    setViewState(v => {
-                        const raw = clamp(v.scale + delta, 0.015625, 64);
-                        // Soft-snap to nearest 1/N or N. Lets the user pass through smoothly
-                        // while gently aligning to clean pixel-art zoom levels.
-                        return { ...v, scale: softSnapZoom(raw), isFit: false };
-                    });
+                    // Multiplicative exponential zoom — each tick is a consistent percentage
+                    // change regardless of current zoom. Cursor-anchored. Soft snap fires
+                    // 200ms after the wheel goes idle so scrolling itself stays free.
+                    const factor = Math.exp(-e.deltaY * 0.002);
+                    const newScale = clamp(viewStateRef.current.scale * factor, 0.015625, 64);
+                    applyZoomCentered(newScale, e.clientX, e.clientY);
+                    triggerSnap(e.clientX, e.clientY);
                 }}
             >
                 <div className="w-full h-full flex items-center justify-center pointer-events-none relative">
@@ -2856,14 +2975,14 @@ export default function App() {
                     {/* ORIGINAL PREVIEW */}
                     <div 
                         className={`absolute transition-opacity duration-200 ${isComparing ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} 
-                        style={{ transform: `translate(${viewState.x}px, ${viewState.y}px) scale(${viewState.scale})`, width: settings.width, height: settings.height }}
+                        style={{ transform: `translate(${displayViewState.x}px, ${displayViewState.y}px) scale(${displayViewState.scale})`, width: settings.width, height: settings.height, willChange: 'transform' }}
                     >
                         <canvas 
                             ref={originalPixelCanvasRef} 
                             className="w-full h-full shadow-2xl" 
-                            style={{ imageRendering: viewState.scale >= 1 ? 'pixelated' : 'auto', display: (viewState.scale >= 1 || !previewUrls.original) ? 'block' : 'none' }} 
+                            style={{ imageRendering: displayViewState.scale >= 1 ? 'pixelated' : 'auto', display: (displayViewState.scale >= 1 || !previewUrls.original) ? 'block' : 'none' }} 
                         />
-                        {(viewState.scale < 1 && previewUrls.original) && (
+                        {(displayViewState.scale < 1 && previewUrls.original) && (
                             <img 
                                 src={previewUrls.original} 
                                 className="w-full h-full shadow-2xl" 
@@ -2876,14 +2995,14 @@ export default function App() {
                     {/* DITHERED PREVIEW */}
                     <div 
                         className={`absolute transition-opacity duration-200 ${isComparing ? 'opacity-0 z-0' : 'opacity-100 z-10'}`} 
-                        style={{ transform: `translate(${viewState.x}px, ${viewState.y}px) scale(${viewState.scale})`, width: settings.width, height: settings.height }}
+                        style={{ transform: `translate(${displayViewState.x}px, ${displayViewState.y}px) scale(${displayViewState.scale})`, width: settings.width, height: settings.height, willChange: 'transform' }}
                     >
                         <canvas 
                             ref={canvasRef} 
                             className="w-full h-full shadow-2xl" 
-                            style={{ imageRendering: viewState.scale >= 1 ? 'pixelated' : 'auto', display: (viewState.scale >= 1 || !previewUrls.dithered) ? 'block' : 'none' }} 
+                            style={{ imageRendering: displayViewState.scale >= 1 ? 'pixelated' : 'auto', display: (displayViewState.scale >= 1 || !previewUrls.dithered) ? 'block' : 'none' }} 
                         />
-                        {(viewState.scale < 1 && previewUrls.dithered) && (
+                        {(displayViewState.scale < 1 && previewUrls.dithered) && (
                             <img 
                                 src={previewUrls.dithered} 
                                 className="w-full h-full shadow-2xl" 
@@ -2897,7 +3016,18 @@ export default function App() {
             </div>
         )}
         
-        {imageSrc && <FloatingToolbar styles={styles} isDark={isDark} zoom={viewState.scale} setZoom={z => setViewState(v => ({...v, scale: typeof z === 'function' ? z(v.scale) : z, isFit: false}))} isComparing={isComparing} onCompareStart={() => setIsComparing(true)} onCompareEnd={() => setIsComparing(false)} onCenter={() => setViewState(v => ({...v, x: 0, y: 0}))} onOneToOne={() => setViewState(v => ({...v, scale: 1, x: 0, y: 0, isFit: false}))} onFit={() => setViewState(v => ({...v, isFit: true}))} isAnimation={isVideo || isGif} isGif={isGif} gifTotalFrames={gifTotalFrames} gifCurrentFrame={gifCurrentFrame} onSeekGif={handleGifSeek} isVideo={isVideo} videoDuration={videoDuration} videoCurrentTime={videoCurrentTime} onSeekVideo={handleVideoSeek} settings={settings} />}
+        {imageSrc && <FloatingToolbar styles={styles} isDark={isDark}
+            zoom={displayViewState.scale}
+            setZoom={z => {
+                // Toolbar's numeric "zoom %" field: set target to typed value, viewport-centered.
+                const newScale = typeof z === 'function' ? z(viewStateRef.current.scale) : z;
+                applyZoomCentered(clamp(newScale, 0.015625, 64));
+            }}
+            isComparing={isComparing} onCompareStart={() => setIsComparing(true)} onCompareEnd={() => setIsComparing(false)}
+            onCenter={() => setViewState(v => ({...v, x: 0, y: 0}))}
+            onOneToOne={() => setViewState(v => ({...v, scale: 1, x: 0, y: 0, isFit: false}))}
+            onFit={() => setViewState(v => ({...v, isFit: true}))}
+            isAnimation={isVideo || isGif} isGif={isGif} gifTotalFrames={gifTotalFrames} gifCurrentFrame={gifCurrentFrame} onSeekGif={handleGifSeek} isVideo={isVideo} videoDuration={videoDuration} videoCurrentTime={videoCurrentTime} onSeekVideo={handleVideoSeek} settings={settings} />}
       </main>
       
       {pickerOpenId && <ColorEditor 
