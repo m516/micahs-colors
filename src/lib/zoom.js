@@ -24,3 +24,16 @@ export const nextZoomSnap = (current, direction) => {
     for (let i = ZOOM_SNAPS.length - 1; i >= 0; i--) if (ZOOM_SNAPS[i] < current - eps) return ZOOM_SNAPS[i];
     return ZOOM_SNAPS[0];
 };
+
+// Largest snap point ≤ z. Used by zoom-to-fit so the auto-fit scale lands
+// on a clean integer (or 1/N) zoom rather than a fractional one — keeps
+// pixel art crisp on initial load and matches the discrete levels offered
+// by the +/- zoom buttons.
+export const floorZoomSnap = (z) => {
+    let best = ZOOM_SNAPS[0];
+    for (const s of ZOOM_SNAPS) {
+        if (s <= z) best = s;
+        else break; // ZOOM_SNAPS is sorted ascending
+    }
+    return best;
+};

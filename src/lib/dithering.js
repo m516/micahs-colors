@@ -380,15 +380,96 @@ export const sortPalette = (palette, mode) => {
     return sorted;
 };
 
+// Build a GIF-ready palette (up to maxColors RGB triplets) from a rendered
+// RGBA pixel buffer. For dither output this is a no-op equivalent — every
+// pixel already is a palette entry, so the unique-color pass returns the
+// user's palette exactly. For mixing modes (linear-projection, paper-*)
+// the renderer produces thousands of interpolated colors; if their unique
+// count exceeds maxColors we median-cut down to maxColors so the GIF can
+// represent the gradient instead of clipping every interpolation back to
+// the closest user-palette color.
+//
+// Fully-transparent pixels are excluded. Returns an array of [r, g, b]
+// triplets, length ≤ maxColors.
+export const buildGifPalette = (rgba, maxColors = 255) => {
+    const unique = new Set();
+    for (let p = 0; p < rgba.length; p += 4) {
+        if (rgba[p + 3] < 128) continue;
+        unique.add((rgba[p] << 16) | (rgba[p + 1] << 8) | rgba[p + 2]);
+        if (unique.size > maxColors) break; // early-out, will median-cut below
+    }
+    if (unique.size <= maxColors) {
+        return [...unique].map(rgb => [(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255]);
+    }
+
+    // Median-cut quantization. Collect all opaque pixels into a single box,
+    // then repeatedly split the box with the longest RGB-axis range at its
+    // median, until we have maxColors boxes. Each box's mean is one palette
+    // entry. O(P log P) per split via the per-axis sort; fine for the frame
+    // sizes we encode here.
+    const pixels = [];
+    for (let p = 0; p < rgba.length; p += 4) {
+        if (rgba[p + 3] >= 128) pixels.push([rgba[p], rgba[p + 1], rgba[p + 2]]);
+    }
+    let boxes = [pixels];
+    while (boxes.length < maxColors) {
+        let bestIdx = -1, bestRange = -1, bestAxis = 0;
+        for (let i = 0; i < boxes.length; i++) {
+            if (boxes[i].length < 2) continue;
+            let minR = 255, minG = 255, minB = 255, maxR = 0, maxG = 0, maxB = 0;
+            for (const px of boxes[i]) {
+                if (px[0] < minR) minR = px[0]; if (px[0] > maxR) maxR = px[0];
+                if (px[1] < minG) minG = px[1]; if (px[1] > maxG) maxG = px[1];
+                if (px[2] < minB) minB = px[2]; if (px[2] > maxB) maxB = px[2];
+            }
+            const rR = maxR - minR, rG = maxG - minG, rB = maxB - minB;
+            const longest = Math.max(rR, rG, rB);
+            if (longest > bestRange) {
+                bestRange = longest;
+                bestIdx = i;
+                bestAxis = rR >= rG ? (rR >= rB ? 0 : 2) : (rG >= rB ? 1 : 2);
+            }
+        }
+        if (bestIdx === -1 || bestRange === 0) break;
+        const box = boxes[bestIdx];
+        box.sort((a, b) => a[bestAxis] - b[bestAxis]);
+        const mid = Math.floor(box.length / 2);
+        boxes.splice(bestIdx, 1, box.slice(0, mid), box.slice(mid));
+    }
+    return boxes.map(box => {
+        let sr = 0, sg = 0, sb = 0;
+        for (const px of box) { sr += px[0]; sg += px[1]; sb += px[2]; }
+        const n = box.length;
+        return [Math.round(sr / n), Math.round(sg / n), Math.round(sb / n)];
+    });
+};
+
+// Pre-dither color transfer lives in lib/grade.js. Re-exported here for
+// backwards compatibility with anything that still imports it from this
+// module path.
+export { applyColorTransfer, COLOR_TRANSFER_MODES } from './grade';
+import { applyColorTransfer } from './grade';
+
 export const renderDitheredImage = (canvas, sourceData, palette, settings) => {
     if (!canvas || !sourceData || !palette.length) return;
     const ctx = canvas.getContext('2d');
     canvas.width = sourceData.width; canvas.height = sourceData.height;
-    
+
     const outputData = new ImageData(new Uint8ClampedArray(sourceData.pixels), sourceData.width, sourceData.height);
     const pixels = outputData.data;
+
+    if (settings.colorTransfer && settings.colorTransfer !== 'none') applyColorTransfer(pixels, palette, settings.colorTransfer);
+
+    // "None" mode: bypass all palette mapping/dithering and just emit the
+    // (possibly color-transferred) source pixels. Useful for previewing the
+    // color-transfer step in isolation.
+    if (settings.ditherSubMethod === 'none') {
+        ctx.putImageData(outputData, 0, 0);
+        return;
+    }
+
     const { width, height } = sourceData;
-    
+
     const { colorSpace, manualWeights, ditherCategory, ditherSubMethod, dithering, bayerSize, serpentine, nCandidates, distanceExponent, riemersmaHistory, ditherSeed, matchMethod } = settings;
     const Converter = ColorSpaceConverter[colorSpace];
     

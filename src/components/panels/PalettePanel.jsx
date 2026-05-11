@@ -58,7 +58,7 @@ export const PalettePanel = ({ settings, updateSetting, paletteData, onPaletteAc
             </div>
             <div className="flex justify-between items-center">
                 <span className="field-label">Color Count</span>
-                <StepperInput value={tempColorCount} onChange={(e) => setTempColorCount(e.target.value)} onBlur={() => applyColorCount(tempColorCount)} onKeyDown={(e) => e.key === 'Enter' && applyColorCount(tempColorCount)} onDecrease={() => applyColorCount(settings.paletteSize - 1)} onIncrease={() => applyColorCount(settings.paletteSize + 1)} />
+                <StepperInput className="w-32" value={tempColorCount} onChange={(e) => setTempColorCount(e.target.value)} onBlur={() => applyColorCount(tempColorCount)} onKeyDown={(e) => e.key === 'Enter' && applyColorCount(tempColorCount)} onDecrease={() => applyColorCount(settings.paletteSize - 1)} onIncrease={() => applyColorCount(settings.paletteSize + 1)} />
             </div>
             <div className={cls.segmentGroup}>{[2, 4, 8, 16, 32, 64, 128, 256].map(p => <button key={p} onClick={() => applyColorCount(p)} className={segmentButton(settings.paletteSize === p)}>{p}</button>)}</div>
             <div className="grid grid-cols-10 gap-0.5 max-h-40 overflow-y-auto custom-scrollbar">

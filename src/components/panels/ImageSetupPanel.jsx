@@ -1,9 +1,12 @@
 import { RotateCcw } from 'lucide-react';
 import { clamp } from '../../lib/math';
-import { PanelSection, NumberInput, RangeSlider, Select } from '../ui';
+import { PanelSection, NumberInput, RangeSlider } from '../ui';
 
+// Source-image knobs: output dimensions and (for animation sources) the
+// playback framerate. Color-space and palette-mapping options live in
+// ColorsPanel — they're conceptually separate enough to warrant their own
+// header in the side panel.
 export const ImageSetupPanel = ({ settings, updateSetting, imageLoaded, onResetOriginalSize, isAnimation }) => {
-    const showMatchMethod = settings.ditherCategory !== 'pattern' && settings.ditherCategory !== 'geometric' && settings.ditherSubMethod !== 'linear-projection' && settings.ditherSubMethod !== 'fw-dither' && settings.ditherSubMethod !== 'paper-beer-lambert' && settings.ditherSubMethod !== 'paper-mixbox';
     return (
         <PanelSection title="Image Setup" action={
             imageLoaded ? <button onClick={onResetOriginalSize} className="field-label hover:text-neutral-900 dark:hover:text-neutral-200 flex items-center gap-1"><RotateCcw size={10} /> Original</button> : null
@@ -14,35 +17,17 @@ export const ImageSetupPanel = ({ settings, updateSetting, imageLoaded, onResetO
             </div>
             <RangeSlider min={32} max={640} step={4} value={Math.min(settings.width, 640)} onChange={(e) => { const w = clamp(Number(e.target.value), 32, 5000); updateSetting('width', w); updateSetting('height', Math.round(w / settings.aspectRatio)); }} />
             {isAnimation && (
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center justify-between">
                     <span className="field-label">Video Framerate</span>
-                    <div className="flex items-center gap-1.5">
+                    {/* w-32 here keeps the row's right edge aligned with every other harmonized
+                        control. Orig. button takes its natural width when present; input flex-1
+                        fills the remainder so the combined group is always exactly 32 units wide. */}
+                    <div className="flex items-center gap-1 w-32">
                         {settings.originalFps && (
-                            <button onClick={() => updateSetting('videoFps', settings.originalFps)} className={`field-label px-1.5 py-1 transition-colors rounded-sm ${settings.videoFps === settings.originalFps ? 'bg-neutral-200 text-black dark:bg-neutral-800 dark:text-white' : 'hover:text-black dark:hover:text-white'}`} title="Reset to Original FPS">Orig.</button>
+                            <button onClick={() => updateSetting('videoFps', settings.originalFps)} className={`field-label px-1.5 py-1 transition-colors ${settings.videoFps === settings.originalFps ? 'bg-neutral-200 text-black dark:bg-neutral-800 dark:text-white' : 'hover:text-black dark:hover:text-white'}`} title="Reset to Original FPS">Orig.</button>
                         )}
-                        <input type="number" min={1} max={120} value={settings.videoFps || 30} onChange={(e) => updateSetting('videoFps', clamp(Number(e.target.value), 1, 120))} className="field-input w-16" />
+                        <input type="number" min={1} max={120} value={settings.videoFps || 30} onChange={(e) => updateSetting('videoFps', clamp(Number(e.target.value), 1, 120))} className="field-input flex-1 min-w-0" />
                     </div>
-                </div>
-            )}
-            <Select value={settings.colorSpace} onChange={(e) => updateSetting('colorSpace', e.target.value)} optgroups={{
-                "Standard": [{value: 'srgb', label: 'sRGB'}, {value: 'linear', label: 'Linear RGB'}],
-                "Perceptual": [{value: 'oklab', label: 'Oklab'}, {value: 'lab', label: 'CIE Lab'}],
-                "Broadcast": [{value: 'yuv', label: 'YUV'}]
-            }} />
-            {showMatchMethod && (
-                <Select value={settings.matchMethod || 'euclidean'} onChange={(e) => updateSetting('matchMethod', e.target.value)} optgroups={{
-                    "Color Matching": [{value: 'euclidean', label: 'Fast (Euclidean Minimum)'}, {value: 'fw', label: 'Slow (FW Highest Weight)'}]
-                }} />
-            )}
-            {(settings.colorSpace === 'srgb' || settings.colorSpace === 'linear') && (
-                <div className="p-3 border space-y-2 bg-neutral-50 border-neutral-200 dark:bg-neutral-900 dark:border-neutral-700">
-                    <span className="field-label">Luma Weights</span>
-                    {['r', 'g', 'b'].map(c => (
-                        <div key={c} className="flex items-center gap-2">
-                            <span className="w-3 field-label">{c}</span>
-                            <RangeSlider min={0} max={1} step={0.01} value={settings.manualWeights[c]} onChange={(e) => updateSetting('manualWeights', { ...settings.manualWeights, [c]: Number(e.target.value) })} />
-                        </div>
-                    ))}
                 </div>
             )}
         </PanelSection>

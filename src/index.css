@@ -84,9 +84,15 @@
   /* === Headings === */
   .app-title { @apply text-sm font-semibold tracking-tight text-neutral-800 dark:text-neutral-200; }
 
-  /* === Labels (visually identical, semantically distinct) === */
-  .panel-title,    /* PanelSection header — "Image Setup", "Palette", "Mixing / Dithering" */
-  .modal-title,    /* Dialog header — "Palette Library" */
+  /* === Section / dialog headers (distinctly stronger than field labels — bigger
+       text and a brighter ink so users can scan for them and not confuse them
+       with inline option labels in the same row). === */
+  .panel-title,    /* PanelSection header — "Image Setup", "Colors", "Palette" */
+  .modal-title     /* Dialog header — "Palette Library" */
+    { @apply text-sm font-bold uppercase tracking-widest text-neutral-800 dark:text-neutral-200; }
+
+  /* === Inline labels (visually identical, semantically distinct — kept subdued
+       so the eye lands on values and headers, not on the label text). === */
   .field-label,    /* Inline control label — "Color Count", "Edit Color", "Luma Weights" */
   .slider-label,   /* Slider param row — "CURVE HISTORY (Q)" with current value beside it */
   .list-count      /* List counter — "X palettes by popularity" */

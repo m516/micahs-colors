@@ -14,7 +14,7 @@ export const cls = {
     popover:      "fixed z-50 shadow-2xl p-4 border bg-white border-neutral-200 dark:bg-neutral-900 dark:border-neutral-700",
     divider:      "w-full h-px bg-neutral-200 dark:bg-neutral-800",
     segmentGroup: "flex p-0.5 gap-0.5 border bg-neutral-100 border-neutral-200 dark:bg-neutral-950 dark:border-neutral-800",
-    section:      "flex flex-col gap-2.5",
+    section:      "flex flex-col gap-1.5",
 };
 
 // One segment of a multi-option picker (color count, bayer matrix size, …).
@@ -96,10 +96,11 @@ export const IconButton = ({ onClick, icon: Icon, title, className = "" }) => (
     </button>
 );
 
-export const StepperInput = ({ value, onDecrease, onIncrease, onChange, onBlur, onKeyDown }) => (
-    <div className="flex items-center border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950">
+export const StepperInput = ({ value, onDecrease, onIncrease, onChange, onBlur, onKeyDown, className = "" }) => (
+    <div className={`flex items-center border border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-950 ${className}`}>
         <button onClick={onDecrease} className={`${cls.buttonGhost} px-2 py-0.5 hover:bg-neutral-500/10`}>-</button>
-        <input type="text" value={value} onChange={onChange} onBlur={onBlur} onKeyDown={onKeyDown} className="w-10 text-center text-xs py-0.5 m-0 border-none bg-transparent focus:outline-none text-neutral-800 dark:text-neutral-200" />
+        {/* flex-1 + min-w-0 so the input fills whatever width the parent grants */}
+        <input type="text" value={value} onChange={onChange} onBlur={onBlur} onKeyDown={onKeyDown} className="flex-1 min-w-0 text-center text-xs py-0.5 m-0 border-none bg-transparent focus:outline-none text-neutral-800 dark:text-neutral-200" />
         <button onClick={onIncrease} className={`${cls.buttonGhost} px-2 py-0.5 hover:bg-neutral-500/10`}>+</button>
     </div>
 );

@@ -3,15 +3,18 @@ import { GifReader, GifWriter } from 'omggif';
 import { Download, Image as ImageIcon, RefreshCw, FolderOpen, Layers, Film, ImagePlay } from 'lucide-react';
 import { clamp, generateId } from './lib/math';
 import { rgbToHex, hexToRgb, ColorSpaceConverter } from './lib/color';
-import { nearestZoomSnap } from './lib/zoom';
-import { extractPaletteHull, renderDitheredImage, sortPalette } from './lib/dithering';
+import { nearestZoomSnap, floorZoomSnap } from './lib/zoom';
+import { extractPaletteHull, renderDitheredImage, sortPalette, buildGifPalette } from './lib/dithering';
+import { applyColorTransfer } from './lib/grade';
 import { cls, IconButton } from './components/ui';
 import { PaletteLibraryModal } from './components/panels/PaletteLibraryModal';
 import { ImageSetupPanel } from './components/panels/ImageSetupPanel';
+import { ColorsPanel } from './components/panels/ColorsPanel';
 import { PalettePanel } from './components/panels/PalettePanel';
 import { DitheringPanel } from './components/panels/DitheringPanel';
 import { ColorEditor } from './components/panels/ColorEditor';
 import { FloatingToolbar } from './components/panels/FloatingToolbar';
+import { ReferencesModal } from './components/panels/ReferencesModal';
 
 export default function App() {
   // Light/dark theme is driven entirely by Tailwind's dark: prefix, which
@@ -35,11 +38,12 @@ export default function App() {
   const [loadingMsg, setLoadingMsg] = useState('Processing...');
   const [settings, setSettings] = useState({
       width: 128, height: 128, aspectRatio: 1,
-      colorSpace: 'oklab', matchMethod: 'euclidean', manualWeights: { r: 0.21, g: 0.72, b: 0.07 },
+      colorSpace: 'oklab', matchMethod: 'fw', manualWeights: { r: 0.21, g: 0.72, b: 0.07 },
       paletteSize: 4, contrastAnchoring: false, genSeed: 0, sortMode: 'impact',
-      ditherCategory: 'pattern', ditherSubMethod: 'bayer', dithering: 0.15, bayerSize: 2, 
+      ditherCategory: 'pattern', ditherSubMethod: 'bayer', dithering: 0.15, bayerSize: 2,
       serpentine: false, nCandidates: 4, distanceExponent: 2.0, riemersmaHistory: 16, riemersmaRatio: 16, ditherSeed: 0,
-      videoFps: 30, originalFps: null
+      videoFps: 30, originalFps: null,
+      colorTransfer: 'none', // 'none' | 'box' | 'reinhard' | 'xiao-ma'
   });
 
   const updateSetting = useCallback((key, value) => { setSettings(prev => ({ ...prev, [key]: value })); }, []);
@@ -74,6 +78,7 @@ export default function App() {
   }, []);
 
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isReferencesOpen, setIsReferencesOpen] = useState(false);
 
   // Magic fix for Canvas downscaling noise: Use actual Blob URLs for smooth browser mipmapping
   const [previewUrls, setPreviewUrls] = useState({ original: null, dithered: null });
@@ -358,18 +363,35 @@ export default function App() {
       const fps = settingsRef.current.videoFps || 30;
       const delay = Math.max(2, Math.round(100 / fps));
 
-      // Directly translate active specific Palette to GIF Palette
-      const customPalette = activePaletteRef.current.map(c => (c.displayR << 16) | (c.displayG << 8) | c.displayB);
-      const transparentIndex = customPalette.length;
+      // For dither modes the rendered output is exactly the user palette, so
+      // we can build the GIF palette once and reuse it across frames. For
+      // mixing modes (linear-projection / paper-beer-lambert / paper-mixbox)
+      // the renderer emits interpolated colors that don't exist in the user
+      // palette; we build a per-frame palette from the actual rendered
+      // pixels (up to 255 colors + 1 transparency = 256, the GIF max) so the
+      // gradients survive instead of being clipped.
+      // "None" and the mixing modes (linear-projection / paper-*) emit pixels
+      // outside the user palette, so the GIF needs a per-frame palette built
+      // from the actual rendered colors rather than the user palette.
+      const isMixingMode = ['none', 'linear-projection', 'paper-beer-lambert', 'paper-mixbox'].includes(settingsRef.current.ditherSubMethod);
 
-      // Pad palette to power of 2
-      let targetLen = 2;
-      while (targetLen < customPalette.length + 1 && targetLen <= 256) targetLen <<= 1;
-      const paletteToUse = [...customPalette, 0x000000];
-      while (paletteToUse.length < targetLen) paletteToUse.push(0);
+      // Build the GIF-frame state (palette, transparentIndex, paletteToUse,
+      // colorCache) from a flat list of RGB ints.
+      const makePaletteState = (rgbInts) => {
+          const transparentIndex = rgbInts.length;
+          let targetLen = 2;
+          while (targetLen < rgbInts.length + 1 && targetLen <= 256) targetLen <<= 1;
+          const paletteToUse = [...rgbInts, 0x000000];
+          while (paletteToUse.length < targetLen) paletteToUse.push(0);
+          const colorCache = new Map();
+          rgbInts.forEach((c, i) => colorCache.set(c, i));
+          return { customPalette: rgbInts, transparentIndex, paletteToUse, colorCache };
+      };
 
-      const colorCache = new Map();
-      customPalette.forEach((c, i) => colorCache.set(c, i));
+      // For non-mixing modes, build once from the user palette.
+      const fixedState = isMixingMode
+          ? null
+          : makePaletteState(activePaletteRef.current.map(c => (c.displayR << 16) | (c.displayG << 8) | c.displayB));
 
       // Overestimate buffer to prevent capacity issues
       const bufSize = Math.max(1024 * 1024 * 5, 1024 + (iter.count * w * h * 3));
@@ -383,6 +405,12 @@ export default function App() {
 
           const ctx = canvasRef.current.getContext('2d');
           const rgba = ctx.getImageData(0, 0, w, h).data;
+
+          const state = fixedState ?? makePaletteState(
+              buildGifPalette(rgba, 255).map(([r, g, b]) => (r << 16) | (g << 8) | b)
+          );
+          const { customPalette, transparentIndex, paletteToUse, colorCache } = state;
+
           const indexedPixels = new Uint8Array(w * h);
           let hasTransparency = false;
 
@@ -486,7 +514,10 @@ export default function App() {
   const resetView = useCallback(() => {
       if (containerRef.current) {
           const cw = containerRef.current.clientWidth, ch = containerRef.current.clientHeight;
-          const scale = Math.min((cw * 0.9) / settings.width, (ch * 0.9) / settings.height, 8);
+          const fit = Math.min((cw * 0.9) / settings.width, (ch * 0.9) / settings.height, 8);
+          // Snap the fit scale down to the nearest clean zoom level (…, 1/2, 1, 2, 3, …)
+          // so the initial view lands on a discrete level instead of a fractional one.
+          const scale = floorZoomSnap(fit);
           // resetView sets the *target*; the RAF loop will animate display toward it.
           setViewState(v => ({ ...v, scale, x: 0, y: 0 }));
       }
@@ -591,7 +622,14 @@ export default function App() {
           const JSZipModule = await import('https://esm.sh/jszip');
           const JSZip = JSZipModule.default || JSZipModule;
           const zip = new JSZip();
-          const { width, height, pixels: srcPixels } = sourceDataRef.current;
+          const { width, height, pixels: rawPixels } = sourceDataRef.current;
+          // Apply the pre-dither color grade to a copy of the source pixels
+          // when enabled. The dither pipeline below reads from `srcPixels`,
+          // so this keeps the export consistent with the on-screen render.
+          const transferMode = settingsRef.current.colorTransfer;
+          const srcPixels = (transferMode && transferMode !== 'none')
+              ? (() => { const copy = new Uint8ClampedArray(rawPixels); applyColorTransfer(copy, activePaletteRef.current, transferMode); return copy; })()
+              : rawPixels;
           const canvas = document.createElement('canvas');
           canvas.width = width; canvas.height = height;
           const ctx = canvas.getContext('2d');
@@ -991,7 +1029,7 @@ export default function App() {
               <span className="text-sm font-bold uppercase tracking-widest mb-2">{isRenderingVideo ? renderPhase : loadingMsg}</span>
               {isRenderingVideo && (
                   <>
-                    <div className="w-64 h-1.5 bg-neutral-800 mt-2"><div className="h-full bg-white transition-all duration-200" style={{ width: `${Math.max(0, renderProgress) * 100}%` }}></div></div>
+                    <div className="w-64 h-1.5 bg-neutral-800 mt-2"><div className="h-full bg-white" style={{ width: `${Math.max(0, renderProgress) * 100}%` }}></div></div>
                     <span className="text-xs font-bold tracking-widest mt-3 text-neutral-400">{Math.round(renderProgress * 100)}%</span>
                   </>
               )}
@@ -1011,7 +1049,9 @@ export default function App() {
            }}>
           <div className="p-4 border-b flex items-center justify-between flex-shrink-0 border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
               <div className="flex items-center gap-2 min-w-0">
-                  <Layers className="w-5 h-5 text-neutral-500 flex-shrink-0" />
+                  <button onClick={() => setIsReferencesOpen(true)} title="View citations for the current configuration" className="flex-shrink-0 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
+                      <Layers className="w-5 h-5" />
+                  </button>
                   <h1 className="app-title truncate">Micah's Colors</h1>
               </div>
               <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -1048,8 +1088,10 @@ export default function App() {
               <input type="file" id="main-upload" className="hidden" accept="image/*,video/*,image/gif" onChange={(e) => processImageFile(e.target.files?.[0])} />
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-6">
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col gap-3">
               <ImageSetupPanel settings={settings} updateSetting={updateSetting} imageLoaded={!!imageSrc} onResetOriginalSize={() => setSettings(s => ({...s, width: lastSourceInfoRef.current.w, height: lastSourceInfoRef.current.h}))} isAnimation={isVideo || isGif} />
+              <div className={cls.divider}></div>
+              <ColorsPanel settings={settings} updateSetting={updateSetting} />
               <div className={cls.divider}></div>
               <PalettePanel
                   settings={settings} updateSetting={updateSetting} paletteData={{ displayed: activePalette }}
@@ -1189,6 +1231,8 @@ export default function App() {
       />}
 
       <PaletteLibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onApply={handleApplyPreset} />
+
+      <ReferencesModal isOpen={isReferencesOpen} onClose={() => setIsReferencesOpen(false)} settings={settings} />
       
       <canvas ref={hiddenCanvasRef} className="hidden" />
       

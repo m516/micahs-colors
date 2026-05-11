@@ -4,7 +4,10 @@ import { LOSPEC_PRESETS, PRESET_PALETTES, lospecPreviewCache, lospecPreviewInFli
 import { cls, Select } from '../ui';
 
 export const PaletteLibraryModal = ({ isOpen, onClose, onApply }) => {
-    const categories = [...Object.keys(PRESET_PALETTES), 'Lospec'];
+    // Lospec is first (and the default) because it's the path that benefits
+    // most from the modal — auto-preview, debounced trial, fuzzy "did you
+    // mean?" suggestions — and is what most users open the library to reach.
+    const categories = ['Lospec', ...Object.keys(PRESET_PALETTES)];
     const [activeCategory, setActiveCategory] = useState(categories[0]);
     const [lospecQuery, setLospecQuery] = useState('');
     const [shuffleSlugs, setShuffleSlugs] = useState(null); // null = no active shuffle
