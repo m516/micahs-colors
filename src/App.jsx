@@ -26,8 +26,8 @@ const hexToRgb = (hex) => {
 // look cleanest (no moire from sub-pixel scaling) at these magnifications.
 const ZOOM_SNAPS = (() => {
     const snaps = [];
-    for (let n = 64; n >= 2; n--) snaps.push(1 / n);  // 1/64 .. 1/2
-    for (let n = 1; n <= 64; n++) snaps.push(n);      // 1, 2, .. 64
+    for (let n = 64; n >= 2; n/=2) snaps.push(1 / n);  // 1/64 .. 1/2
+    for (let n = 1; n <= 32; n++) snaps.push(n);      // 1, 2, .. 64
     return snaps;
 })();
 
