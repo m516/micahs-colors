@@ -2400,7 +2400,7 @@ export default function App() {
       snapTimeoutRef.current = setTimeout(() => {
           const cur = viewStateRef.current.scale;
           const snap = nearestZoomSnap(cur);
-          if (Math.abs(cur - snap) / snap < 0.15 && cur !== snap) {
+          if (cur !== snap) {
               applyZoomCentered(snap, clientX, clientY);
           }
       }, 200);
