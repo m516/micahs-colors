@@ -121,6 +121,18 @@ export const findNearestPresetSlugs = (query, n = 5) => {
         .map(x => x.slug);
 };
 
+// Append a successfully-fetched-and-applied slug to the known-preset list so
+// future filters, fuzzy-matches, and the count reflect the user's discovery.
+// Appended (not prepended) because LOSPEC_PRESETS is popularity-ordered and
+// these slugs are outside the curated top-N by definition. Module-level
+// mutation: survives across modal open/close like the preview cache; gone
+// after page reload.
+export const registerKnownPresetSlug = (slug) => {
+    if (!slug || LOSPEC_PRESETS.includes(slug)) return false;
+    LOSPEC_PRESETS.push(slug);
+    return true;
+};
+
 export const fetchLospecPalette = async (rawSlug) => {
     const slug = extractLospecSlug(rawSlug);
     if (!slug) throw new Error('Empty or invalid slug.');

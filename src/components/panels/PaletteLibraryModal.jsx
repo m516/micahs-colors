@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Library, X, Dices } from 'lucide-react';
-import { LOSPEC_PRESETS, PRESET_PALETTES, lospecPreviewCache, lospecPreviewInFlight, fetchLospecPalette, extractLospecSlug, findNearestPresetSlugs } from '../../lib/palettes';
+import { LOSPEC_PRESETS, PRESET_PALETTES, lospecPreviewCache, lospecPreviewInFlight, fetchLospecPalette, extractLospecSlug, findNearestPresetSlugs, registerKnownPresetSlug } from '../../lib/palettes';
 import { cls, Select } from '../ui';
 
 export const PaletteLibraryModal = ({ isOpen, onClose, onApply }) => {
@@ -62,10 +62,11 @@ export const PaletteLibraryModal = ({ isOpen, onClose, onApply }) => {
         ? findNearestPresetSlugs(trialSlug, 5).filter(s => s !== trialSlug && !filteredPresets.includes(s))
         : [];
 
-    // Top-3 auto-preview: only from the known-preset matches. The trial row
-    // has its own debounced fetch (below) and the suggestions stay
-    // click-to-preview to keep the network burst small.
-    const toPreload = filteredPresets.slice(0, 3);
+    // Top-3 auto-preview: in shuffle mode, preload all 3 random picks so the
+    // user sees previews immediately; otherwise the first 3 of the filter
+    // matches. The trial row has its own debounced fetch (below) and the
+    // suggestions stay click-to-preview to keep the network burst small.
+    const toPreload = shuffleSlugs || filteredPresets.slice(0, 3);
 
     // Fire-and-forget preview fetch. Module-level cache and in-flight set survive
     // modal close/reopen and Strict-mode double-effect-invoke.
@@ -134,6 +135,10 @@ export const PaletteLibraryModal = ({ isOpen, onClose, onApply }) => {
     const handleSlugClick = (slug) => {
         const cached = lospecPreviewCache.get(slug);
         if (cached?.colors) {
+            // If this was a trial slug (user-discovered, not in the curated
+            // top-N), promote it to a known preset so future filters/counts
+            // include it.
+            registerKnownPresetSlug(slug);
             onApply(cached.colors);
             return;
         }
@@ -225,11 +230,16 @@ export const PaletteLibraryModal = ({ isOpen, onClose, onApply }) => {
                         </div>
 
                         <div className="list-count mt-3 mb-2">
-                            {shuffleSlugs
-                                ? '3 random palettes'
-                                : filterTerm
-                                    ? `${filteredPresets.length} of ${LOSPEC_PRESETS.length} match /${filterTerm}/i`
-                                    : `${LOSPEC_PRESETS.length} popular palettes`}
+                            {shuffleSlugs ? (
+                                <>
+                                    3 random palettes ·{' '}
+                                    <button onClick={() => setShuffleSlugs(null)} className="underline hover:text-neutral-700 dark:hover:text-neutral-300">
+                                        show all
+                                    </button>
+                                </>
+                            ) : filterTerm
+                                ? `${filteredPresets.length} of ${LOSPEC_PRESETS.length} match /${filterTerm}/i`
+                                : `${LOSPEC_PRESETS.length} popular palettes`}
                         </div>
 
                         {shuffleSlugs ? (
