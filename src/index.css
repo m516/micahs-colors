@@ -11,6 +11,19 @@
 @theme {
   --font-sans: "VT323", monospace;
   --font-mono: "VT323", monospace;
+  /* VT323 is a pixel font that reads better a touch larger than Tailwind's
+     defaults, with tight line-heights. These tokens drive both the `text-xs`
+     utility and any `@apply text-xs` reference (e.g. inside the t-* scale),
+     so the size stays consistent whether you reach for the utility directly
+     or via a semantic class. */
+  --text-xs: 1.0rem;
+  --text-xs--line-height: 0.7;
+  --text-sm: 1.1rem;
+  --text-sm--line-height: 0.7;
+  --text-base: 1.2rem;
+  --text-base--line-height: 1;
+  --text-lg: 1.5rem;
+  --text-lg--line-height: 1;
 }
 
 @layer base {
@@ -42,10 +55,7 @@
 }
 
 @layer utilities {
-  .text-xs { font-size: 1.0rem; line-height: 0.7; }
-  .text-sm { font-size: 1.1rem; line-height: 0.7; }
-  .text-base { font-size: 1.2rem; line-height: 1; }
-  .text-lg { font-size: 1.5rem; line-height: 1; }
+  /* text-xs / text-sm / text-base / text-lg sizes are configured in @theme above. */
   .compact {
     --pad-xs: 0.0rem;
     --pad-sm: 0.0rem;
@@ -56,4 +66,62 @@
   .pixel-radius {
     border-radius: 0px;
   }
+}
+
+/*
+ * UI element styles — one class per kind of element, named by its function
+ * (what it IS in the UI), not how it looks. When two elements have the same
+ * visual style but different roles (e.g. a panel title vs a slider label),
+ * they get separate names so the JSX reads as a list of UI roles.
+ *
+ * Visually-identical roles share a single declaration via comma selectors so
+ * adjusting the look of, say, all labels at once is a one-line change.
+ *
+ * Sizes come from the @theme block above (--text-xs etc.), so they stay in
+ * sync with bare text-* utilities.
+ */
+@layer components {
+  /* === Headings === */
+  .app-title { @apply text-sm font-semibold tracking-tight text-neutral-800 dark:text-neutral-200; }
+
+  /* === Labels (visually identical, semantically distinct) === */
+  .panel-title,    /* PanelSection header — "Image Setup", "Palette", "Mixing / Dithering" */
+  .modal-title,    /* Dialog header — "Palette Library" */
+  .field-label,    /* Inline control label — "Color Count", "Edit Color", "Luma Weights" */
+  .slider-label,   /* Slider param row — "CURVE HISTORY (Q)" with current value beside it */
+  .list-count      /* List counter — "X palettes by popularity" */
+    { @apply text-xs font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-500; }
+
+  /* Tiny label inside popovers (Offset row in the color editor) */
+  .field-label-xs { @apply text-[10px] font-bold uppercase tracking-widest text-neutral-400 dark:text-neutral-500; }
+
+  /* === Form controls === */
+  .field-input,
+  .field-select {
+    @apply text-xs p-1.5 border transition-all focus:outline-none focus:ring-1 focus:ring-neutral-500/50;
+    @apply bg-white border-neutral-300 text-neutral-900 dark:bg-neutral-950 dark:border-neutral-700 dark:text-neutral-100;
+  }
+  .field-select { @apply w-full appearance-none cursor-pointer; }
+
+  /* Range slider — separate because the thumb pseudo-elements are too long to inline */
+  .field-range {
+    @apply w-full h-1.5 appearance-none cursor-pointer bg-white dark:bg-neutral-950;
+    @apply [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-neutral-500 dark:[&::-webkit-slider-thumb]:bg-neutral-400;
+    @apply [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:bg-neutral-500 dark:[&::-moz-range-thumb]:bg-neutral-400 [&::-moz-range-thumb]:border-none [&::-moz-range-track]:bg-transparent;
+  }
+
+  /* Segmented control button — one segment of a multi-option picker (color count, bayer size). Active/inactive colors are applied inline since they depend on selection state. */
+  .segment-button { @apply flex-1 py-1 text-xs font-bold uppercase tracking-tighter transition-all; }
+
+  /* Dropdown menu item — entry in an action menu (Export Palette options) */
+  .menu-item { @apply text-xs px-3 py-2 text-left uppercase transition-colors text-neutral-900 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700; }
+
+  /* === Code / numeric displays === */
+  .hex-code      { @apply text-[10px] font-mono text-neutral-500; }       /* hex code below a color swatch */
+  .frame-counter { @apply text-xs font-mono text-neutral-400 dark:text-neutral-500; }   /* current/total frame number in the animation toolbar */
+
+  /* === Helper / status text === */
+  .source-note,    /* Italic attribution under a control — "Source: lospec.com/…" */
+  .empty-message   /* Empty-list helper — "No preset matches…" */
+    { @apply text-xs italic text-neutral-400 dark:text-neutral-500; }
 }
