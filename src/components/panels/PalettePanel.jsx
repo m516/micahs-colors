@@ -52,7 +52,7 @@ export const PalettePanel = ({ settings, updateSetting, paletteData, onPaletteAc
                 <div className="flex gap-0.5 items-center">
                     <IconButton icon={Library} onClick={() => onPaletteAction.openLibrary()} title="Palette Library" />
                     <IconButton icon={ImageIcon} onClick={() => extractInputRef.current?.click()} title="Extract from Frame" />
-                    <input type="file" ref={extractInputRef} className="hidden" accept="image/*" onChange={(e) => onPaletteAction.extractFromImage(e.target.files?.[0])} />
+                    <input type="file" ref={extractInputRef} className="hidden" accept="image/*" onChange={(e) => { onPaletteAction.extractFromImage(e.target.files?.[0]); e.target.value = null; }} />
                     <IconButton icon={RefreshCw} onClick={() => updateSetting('genSeed', s => s + 1)} title="Reseed Auto-Extraction" />
                 </div>
             </div>

@@ -4,8 +4,9 @@ import { Download, Image as ImageIcon, RefreshCw, FolderOpen, Layers, Film, Imag
 import { clamp, generateId } from './lib/math';
 import { rgbToHex, hexToRgb, ColorSpaceConverter } from './lib/color';
 import { nearestZoomSnap, floorZoomSnap } from './lib/zoom';
-import { extractPaletteHull, renderDitheredImage, sortPalette, buildGifPalette } from './lib/dithering';
+import { renderDitheredImage, sortPalette, buildGifPalette } from './lib/dithering';
 import { applyColorTransfer } from './lib/grade';
+import { runExtractor } from './lib/palette-extractors';
 import { cls, IconButton } from './components/ui';
 import { PaletteLibraryModal } from './components/panels/PaletteLibraryModal';
 import { ImageSetupPanel } from './components/panels/ImageSetupPanel';
@@ -39,7 +40,9 @@ export default function App() {
   const [settings, setSettings] = useState({
       width: 128, height: 128, aspectRatio: 1,
       colorSpace: 'oklab', matchMethod: 'fw', manualWeights: { r: 0.21, g: 0.72, b: 0.07 },
-      paletteSize: 4, contrastAnchoring: false, genSeed: 0, sortMode: 'impact',
+      paletteSize: 4, genSeed: 0, sortMode: 'impact',
+      paletteExtractor: 'hull',
+      contrastEnhancement: 'none', // 'none' | 'extremes' | 'single-corners' | 'every-corners'
       ditherCategory: 'pattern', ditherSubMethod: 'bayer', dithering: 0.15, bayerSize: 2,
       serpentine: false, nCandidates: 4, distanceExponent: 2.0, riemersmaHistory: 16, riemersmaRatio: 16, ditherSeed: 0,
       videoFps: 30, originalFps: null,
@@ -146,7 +149,7 @@ export default function App() {
       const reader = new GifReader(uint8Array);
       const w = reader.width; const h = reader.height;
       const frameCount = reader.numFrames();
-      
+
       lastSourceInfoRef.current = { w, h };
       const ar = w / h;
       const initialWidth = Math.min(w, 360);
@@ -190,7 +193,7 @@ export default function App() {
       setGifCurrentFrame(0);
       setViewState(v => ({ ...v, isFit: true }));
       setSettings(s => ({ ...s, aspectRatio: ar, width: initialWidth, height: Math.round(initialWidth / ar), videoFps: avgFps, originalFps: avgFps }));
-      
+
       // Wait for next tick to ensure settings propagation before extracting
       setTimeout(() => extractFrameFromSource(frames[0].canvas), 50);
   };
@@ -204,14 +207,14 @@ export default function App() {
     const isGifFile = file.type === 'image/gif';
 
     const url = URL.createObjectURL(file);
-    
+
     if (type === 'main') {
         if (isGifFile) {
             setLoadingMsg('Decoding GIF frames...');
             const reader = new FileReader();
             reader.onload = async (e) => {
                 await processGifBuffer(e.target.result);
-                setImageSrc(url); 
+                setImageSrc(url);
                 setLoading(false);
             };
             reader.readAsArrayBuffer(file);
@@ -223,6 +226,61 @@ export default function App() {
         }
     }
 
+    // Extract-from-Image on a GIF: prefer the GIF's embedded palette (Global
+    // Color Table or frame 0's Local Color Table, whichever omggif resolves)
+    // over a hull extraction on the rasterized first frame. Drop the
+    // transparent index — it carries no useful color. Falls through to the
+    // hull path if the GIF has no usable palette table.
+    if (type === 'palette' && isGifFile) {
+        const fr = new FileReader();
+        fr.onload = (e) => {
+            try {
+                const uint8 = new Uint8Array(e.target.result);
+                const gif = new GifReader(uint8);
+                const info = gif.numFrames() > 0 ? gif.frameInfo(0) : null;
+                if (!info || !info.palette_offset || info.palette_size === 0) {
+                    throw new Error('GIF has no embedded palette');
+                }
+                const liveSettings = settingsRef.current;
+                const Converter = ColorSpaceConverter[liveSettings.colorSpace];
+                const palette = [];
+                for (let i = 0; i < info.palette_size; i++) {
+                    if (i === info.transparent_index) continue;
+                    const r = uint8[info.palette_offset + i * 3];
+                    const g = uint8[info.palette_offset + i * 3 + 1];
+                    const b = uint8[info.palette_offset + i * 3 + 2];
+                    palette.push({
+                        r, g, b,
+                        displayR: r, displayG: g, displayB: b,
+                        transformed: Converter.to(r, g, b),
+                        offsetX: 0, offsetY: 0,
+                        // locked=true so the next auto-extract (any sourceVersion /
+                        // settings bump) preserves these colors instead of replacing
+                        // them with a fresh hull extraction from the source frame.
+                        locked: true, isNew: true,
+                        id: generateId(),
+                        impactIndex: palette.length,
+                    });
+                }
+                if (palette.length > 0) {
+                    // Embedded palettes are sized by the GIF, not by settings.paletteSize.
+                    // Bumping the setting keeps the swatch grid / segment buttons honest.
+                    setSettings(s => ({ ...s, paletteSize: Math.min(256, Math.max(2, palette.length)) }));
+                    setActivePalette(sortPalette(palette, liveSettings.sortMode));
+                }
+            } catch (err) {
+                console.warn('processImageFile: GIF palette extraction failed', err);
+            }
+            setLoading(false);
+        };
+        fr.onerror = () => {
+            console.warn('processImageFile: failed to read GIF buffer', file?.name);
+            setLoading(false);
+        };
+        fr.readAsArrayBuffer(file);
+        return;
+    }
+
     const img = new Image();
     img.onload = () => {
       if (type === 'main') {
@@ -230,21 +288,37 @@ export default function App() {
           lastSourceInfoRef.current = { w: img.width, h: img.height };
           const initialWidth = Math.min(img.width, 360);
           const initialHeight = Math.round(initialWidth / ar);
-          setSettings(s => ({ ...s, aspectRatio: ar, width: initialWidth, height: initialHeight, originalFps: null })); 
-          setImageSrc(img.src); 
+          setSettings(s => ({ ...s, aspectRatio: ar, width: initialWidth, height: initialHeight, originalFps: null }));
+          setImageSrc(img.src);
           setViewState(v => ({ ...v, isFit: true }));
           setTimeout(() => extractFrameFromSource(img), 0);
       } else if (type === 'palette') {
+          // Read settings via the ref so a colorSpace/manualWeights change that
+          // arrived AFTER processImageFile was memoized still applies to this
+          // extraction. activePaletteRef is already up-to-date for locked colors.
+          const liveSettings = settingsRef.current;
           const canv = document.createElement('canvas'); canv.width = 128; canv.height = 128;
           const ctx = canv.getContext('2d'); ctx.drawImage(img, 0, 0, 128, 128);
           const data = ctx.getImageData(0, 0, 128, 128);
-          const np = extractPaletteHull(data.data, settings.paletteSize, settings, activePaletteRef.current.filter(c => c.locked));
-          setActivePalette(sortPalette(np, settings.sortMode));
+          // Pass [] for the locked-seed argument so a previous Extract-from-Image
+          // (which leaves every color locked) doesn't short-circuit a hull-style
+          // extractor that respects locked seeds. Then lock every fresh color so
+          // the auto-extract effect doesn't replace them on the next source /
+          // settings bump.
+          const np = runExtractor(liveSettings.paletteExtractor || 'hull', data.data, liveSettings.paletteSize, liveSettings, []);
+          const locked = np.map(c => ({ ...c, locked: true }));
+          if (locked.length > 0) setActivePalette(sortPalette(locked, liveSettings.sortMode));
       }
       setLoading(false);
     };
+    // Without this the loading overlay sticks forever if the picked file fails
+    // to decode (HEIC, corrupted JPEG, animated AVIF, etc).
+    img.onerror = () => {
+      console.warn('processImageFile: failed to decode', file?.name);
+      setLoading(false);
+    };
     img.src = url;
-  }, [settings.paletteSize, settings.sortMode, extractFrameFromSource]);
+  }, [extractFrameFromSource]);
 
   useEffect(() => {
     if (!imageSrc || !hiddenCanvasRef.current || isGif) return;
@@ -262,11 +336,11 @@ export default function App() {
     if (!sourceDataRef.current || isRenderingVideo) return;
     const timer = setTimeout(() => {
         const locked = activePaletteRef.current.filter(c => c.locked);
-        const np = extractPaletteHull(sourceDataRef.current.pixels, settings.paletteSize, settings, locked);
+        const np = runExtractor(settings.paletteExtractor || 'hull', sourceDataRef.current.pixels, settings.paletteSize, settings, locked);
         setActivePalette(sortPalette(np, settings.sortMode));
     }, 50);
     return () => clearTimeout(timer);
-  }, [sourceVersion, settings.paletteSize, settings.contrastAnchoring, settings.colorSpace, settings.genSeed, settings.sortMode, recalcTrigger, isRenderingVideo]);
+  }, [sourceVersion, settings.paletteSize, settings.contrastEnhancement, settings.colorSpace, settings.genSeed, settings.sortMode, settings.paletteExtractor, recalcTrigger, isRenderingVideo]);
 
   // Adaptive render debounce. The render effect is the heaviest in the app, so we want it
   // throttled — but rate-of-arrival is the right signal, not a single constant. Rapid

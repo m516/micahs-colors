@@ -7,11 +7,6 @@
 //   formal      — 'peer-reviewed' | 'standard' | 'technical-report' | 'blog' | 'folklore'
 //                 ('folklore' covers items with no formal publication where the
 //                 attribution traces back to forum posts or shipped binaries)
-//
-// Corrections from references.md have been applied (Stage 1 + Stage 2 + DOI/ISBN
-// additions). Items #14 (Atkinson), #15 (Sierra), #19 (Riemersma), and #20
-// (Hilbert) had material errors and are now rewritten; items #1 (sRGB), #3
-// (Oklab), #4 (CIELAB), and #10 (Bayer) had partial errors that are tightened.
 export const REFERENCES = {
 
     // === Color spaces ===

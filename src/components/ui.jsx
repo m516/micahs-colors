@@ -80,9 +80,9 @@ export const Select = ({ value, onChange, options, optgroups, className = "" }) 
     <select value={value} onChange={onChange} className={`field-select ${className}`}>
         {optgroups ? Object.entries(optgroups).map(([label, opts]) => (
             <optgroup key={label} label={label}>
-                {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {opts.map(o => <option key={o.value} value={o.value} title={o.title}>{o.label}</option>)}
             </optgroup>
-        )) : options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        )) : options?.map(o => <option key={o.value} value={o.value} title={o.title}>{o.label}</option>)}
     </select>
 );
 

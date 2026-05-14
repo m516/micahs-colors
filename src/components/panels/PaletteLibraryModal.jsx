@@ -196,7 +196,7 @@ export const PaletteLibraryModal = ({ isOpen, onClose, onApply }) => {
                     <Select value={safeCategory} onChange={e => { setActiveCategory(e.target.value); setLospecError(''); }} options={categories.map(c => ({value: c, label: c}))} />
                     {safeCategory === 'Lospec' ? (
                         <p className="source-note mt-2">
-                            Source: <a href="https://lospec.com/palette-list" target="_blank" rel="noreferrer" className="underline hover:text-neutral-300">lospec.com/palette-list</a>. Click a slug to load its preview; click the preview to apply. Top 3 of the visible list auto-preview.
+                            Source: <a href="https://lospec.com/palette-list" target="_blank" rel="noreferrer" className="underline hover:text-neutral-300">lospec.com/palette-list</a>.
                         </p>
                     ) : PRESET_PALETTES[safeCategory]?._source && (
                         <p className="source-note mt-2">

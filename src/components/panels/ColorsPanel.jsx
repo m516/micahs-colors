@@ -1,4 +1,46 @@
 import { cls, segmentButton, PanelSection, RangeSlider, Select } from '../ui';
+import { EXTRACTOR_LIST } from '../../lib/palette-extractors';
+
+// Group the Palette Picker dropdown by speedTier so users can pick "fast and
+// cheap" vs "slow and accurate" before worrying about family. Tier ordering is
+// fastest → slowest. Within a tier we preserve the registry's order (which
+// puts 'hull', the default, first under Realtime).
+const SPEED_TIER_ORDER = ['realtime', 'interactive', 'slow', 'prohibitive'];
+const SPEED_TIER_LABEL = {
+    realtime:    'Realtime',
+    interactive: 'Interactive',
+    slow:        'Slow',
+    prohibitive: 'Prohibitive',
+};
+const PALETTE_EXTRACTOR_OPTGROUPS = (() => {
+    const tiers = {};
+    for (const a of EXTRACTOR_LIST) {
+        const tier = a.speedTier || 'realtime';
+        (tiers[tier] ||= []).push({ value: a.id, label: a.name, title: `${a.name} (${a.author}, ${a.year}) — ${a.blurb}` });
+    }
+    const ordered = {};
+    for (const tier of SPEED_TIER_ORDER) {
+        if (tiers[tier]) ordered[SPEED_TIER_LABEL[tier]] = tiers[tier];
+    }
+    return ordered;
+})();
+
+// Hover tooltip on the label — describes what the option controls in general.
+// Per-algorithm detail is in EXTRACTOR_LIST[].blurb (shown via the option's own
+// title attribute when the menu is open).
+const PALETTE_EXTRACTOR_HELP =
+    "How the palette is derived from the source image. Options are grouped by " +
+    "speed: Realtime algorithms run instantly even at large K; Interactive ones " +
+    "may pause briefly; Slow and Prohibitive use heavier optimization that pays " +
+    "off most at small K. Default is Micah's. " +
+    "Hover any option for the algorithm's details.";
+
+const CONTRAST_ENHANCEMENT_HELP =
+    "Reserve palette slots for high-contrast 'anchor' colors before the main " +
+    "picker runs, so the resulting palette covers the image's extremes. " +
+    "Off: skip. Ends: darkest + brightest pixel (by L in the selected space). " +
+    "1×8: 8 corner pixels of the [0,1]³ cube in the selected space. " +
+    "N×8: 8 corners in every supported color space — broader spread.";
 
 // Tooltip on the Color Matching label — kept here so the wording stays
 // alongside the option labels it describes. Frank-Wolfe is the slower
@@ -94,6 +136,34 @@ export const ColorsPanel = ({ settings, updateSetting }) => {
                     ))}
                 </div>
             )}
+            {/* Palette-derivation knobs sit at the bottom of the Colors section so
+                they read as a bridge into the Palette panel below — the picker
+                chooses HOW the swatches are sourced and the contrast switch
+                reserves slots before that picker runs. */}
+            <div className="flex items-center justify-between">
+                <span className="field-label cursor-help" title={PALETTE_EXTRACTOR_HELP}>Palette Picker</span>
+                <Select className="w-32" value={settings.paletteExtractor || 'hull'} onChange={(e) => updateSetting('paletteExtractor', e.target.value)} optgroups={PALETTE_EXTRACTOR_OPTGROUPS} />
+            </div>
+            <div className="flex items-center justify-between">
+                <span className="field-label cursor-help" title={CONTRAST_ENHANCEMENT_HELP}>Contrast 🡅</span>
+                <div className={`${cls.segmentGroup} w-32`}>
+                    {[
+                        {value: 'none',            label: 'Off',  title: 'No contrast enhancement — the palette picker runs unmodified.'},
+                        {value: 'extremes',        label: 'Ends', title: 'Brightest + darkest — reserves the two pixels with min/max luminance in the selected color space as palette seeds.'},
+                        {value: 'single-corners',  label: '1×8',  title: 'Single-space corners — 8 pixels (one per corner of the [0,1]³ cube) in the selected color space, normalized against the image\'s bounds.'},
+                        {value: 'every-corners',   label: 'N×8',  title: 'Every-space corners — 8 corners in each of sRGB, Linear, Oklab, CIE Lab, and YUV; deduped. Up to 40 seeds spread under every implemented perceptual metric.'},
+                    ].map(opt => (
+                        <button
+                            key={opt.value}
+                            onClick={() => updateSetting('contrastEnhancement', opt.value)}
+                            className={segmentButton((settings.contrastEnhancement || 'none') === opt.value)}
+                            title={opt.title}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
         </PanelSection>
     );
 };
